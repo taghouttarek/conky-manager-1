@@ -72,7 +72,7 @@ function draw_network_info(cr, x, y)
     if down == "0B/s" then
         down = conky_parse('${downspeed enp1s0f0}')
     end
-    draw_text(cr, x + 10, y, "↓ " .. down, 10, transparency_active)
+    draw_text(cr, x + 10, y, "Down: " .. down, 10, transparency_active)
     y = y + 18
 
     -- Upload speed
@@ -80,7 +80,7 @@ function draw_network_info(cr, x, y)
     if up == "0B/s" then
         up = conky_parse('${upspeed enp1s0f0}')
     end
-    draw_text(cr, x + 10, y, "↑ " .. up, 10, transparency_active)
+    draw_text(cr, x + 10, y, "Up: " .. up, 10, transparency_active)
 
     return y + 20
 end
@@ -99,7 +99,7 @@ function draw_network_bandwidth(cr, x, y)
     if down_speed == "0B/s" then
         down_speed = conky_parse('${downspeed enp1s0f0}')
     end
-    draw_text(cr, x + 10, y + 45, "↓ " .. down_speed, 11, transparency_active)
+    draw_text(cr, x + 10, y + 45, "Down: " .. down_speed, 11, transparency_active)
 
     -- Download bar
     local down_val = tonumber(conky_parse('${downspeedf wlp2s0}')) or 0
@@ -122,7 +122,7 @@ function draw_network_bandwidth(cr, x, y)
     if up_speed == "0B/s" then
         up_speed = conky_parse('${upspeed enp1s0f0}')
     end
-    draw_text(cr, x + 10, y + 80, "↑ " .. up_speed, 11, transparency_active)
+    draw_text(cr, x + 10, y + 80, "Up: " .. up_speed, 11, transparency_active)
 
     -- Upload bar
     local up_val = tonumber(conky_parse('${upspeedf wlp2s0}')) or 0
