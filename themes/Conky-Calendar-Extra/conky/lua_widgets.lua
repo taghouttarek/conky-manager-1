@@ -265,35 +265,17 @@ function draw_function(cr)
   
 --- Temperatures ---
 
-  cairo_move_to(cr,(w-x_rel_pos)/2-50,(h-y_rel_pos)/2+50)
-  cairo_set_font_size(cr,8)
+  local x = (w-x_rel_pos)/2
+  local temp_val = tonumber(conky_parse("${exec sensors|grep 'Tctl:'|awk '{print $2}'| cut -b2,3,4,5}"))
+  if temp_val == nil then temp_val = 0 end
 
-  for i=1, number_of_physical_CPU_cores do
-    x = (w-x_rel_pos)/2-((8*number_of_physical_CPU_cores)+5*(number_of_physical_CPU_cores-1))/2+13*(i-1)
-    
-    if enable_graphic_card_temperature_sensor == "Yes" and i == number_of_physical_CPU_cores then
-      str= tonumber(conky_parse("${exec nvidia-smi | grep '" .. graphic_card_model .. "' -A 1 | tail -n 1 | awk '{print $3}' | cut -b1,2}"))
-      vertical_bars(cr,x,h-y_rel_pos,64,75,str)
-      cairo_arc(cr,x+4,(h-y_rel_pos)/2+50,4,0,2*math.pi)
-      cairo_fill(cr)
-      cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR)
-      cairo_move_to(cr,x+1,(h-y_rel_pos)/2+53)
-      cairo_show_text(cr,"G")
-      cairo_set_operator(cr, CAIRO_OPERATOR_OVER)
-    else
-      str = "${exec sensors|grep 'temp" .. tostring(i-1) .. ":'|awk '{print $2}'| cut -b2,3,4,5}"
-      local temp_val = tonumber(conky_parse(str))
-      if temp_val == nil then temp_val = 0 end
-      vertical_bars(cr,x,h-y_rel_pos,64,75,temp_val)
-      cairo_arc(cr,x+4,(h-y_rel_pos)/2+50,4,0,2*math.pi)
-      cairo_fill(cr)
-      cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR)
-      cairo_move_to(cr,x+2,(h-y_rel_pos)/2+53)
-      cairo_show_text(cr,tostring(i-1))
-      cairo_set_operator(cr, CAIRO_OPERATOR_OVER)
-    end
-    
-  end
+  vertical_bars(cr,x-5,h-y_rel_pos,64,75,temp_val)
+  cairo_arc(cr,x-1,(h-y_rel_pos)/2+50,4,0,2*math.pi)
+  cairo_fill(cr)
+  cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR)
+  cairo_move_to(cr,x-4,(h-y_rel_pos)/2+53)
+  cairo_show_text(cr,"CPU")
+  cairo_set_operator(cr, CAIRO_OPERATOR_OVER)
 end
 
 function conky_start_widgets()
