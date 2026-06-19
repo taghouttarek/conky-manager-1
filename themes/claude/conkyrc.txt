@@ -1,0 +1,85 @@
+--[[
+  ================================================================================
+  Conky Theme: Nordic Frost Minimalist
+  Generated via Conky Modern Theme Manager & Customizer
+  Style: NORDIC
+  Fonts: Primary (Inter), Monospace (Fira Code)
+  ================================================================================
+--]]
+
+conky.config = {
+    -- Window placement and double buffering
+    alignment = 'top_right',
+    gap_x = 30,
+    gap_y = 60,
+    minimum_width = 300,
+    minimum_height = 420,
+    maximum_width = 320,
+    double_buffer = true,
+    update_interval = 1.0,
+
+    -- Window styling and composite translucency
+    own_window = true,
+    own_window_class = 'Conky',
+    own_window_type = 'desktop',
+    own_window_transparent = false,
+    own_window_argb_visual = true,
+    own_window_argb_value = 204, -- Hex alpha matching 80% opacity
+    own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager',
+    own_window_title = 'Nordic Frost Minimalist',
+
+    -- Borders & Padding
+    border_width = 1,
+    border_inner_margin = 16,
+    border_outer_margin = 0,
+    draw_borders = true,
+    draw_graph_borders = true,
+
+    -- Typography & Encoding
+    use_xft = true,
+    font = 'Inter:size=11',
+    xftalpha = 1.0,
+    override_utf8_locale = true,
+
+    -- Color palette assignments
+    default_color = '#e5e9f0',
+    color1 = '#88c0d0',          -- Theme primary accent
+    color2 = '#4c566a',         -- Border/subtle element color
+    color3 = '#e5e9f0',          -- General system labels
+}
+
+conky.text = [[
+${alignc}${font Inter:bold:size=${expr 11 + 4}}NORDIC FROST MINIMALIST${font}
+${alignc}${color1}-----${color2} 系统监控 ${color1}-----
+${color2}${hr 1}
+
+${color3}系统可用时长:${color} ${alignr}${uptime}
+${color3}主机内核:${color} ${alignr}${kernel}
+
+${color3}${font Inter:bold:size=${fontSizeBase}}中央处理器 (CPU):${font} ${alignr}${cpu cpu0}%
+${color1}${cpubar 6}
+${color3}核心温度:${color} ${alignr}${acpitemp}°C
+${color3}核心频率:${color} ${alignr}${freq_g} GHz
+${color2}${hr 1}
+${color3}${font Inter:bold:size=${fontSizeBase}}随机存储器 (RAM):${font} ${alignr}${memperc}%
+${color3}已用大小:${color} ${mem} ${alignr}${color3}物理总量:${color} ${memmax}
+${color1}${membar 6}
+${color2}${hr 1}
+${color3}${font Inter:bold:size=${fontSizeBase}}本地局域网络 (NET):${font}
+${color3}私有IP地址:${color} ${alignr}${addr wlan0}
+${color3}下行带宽:${color} ${downspeed wlan0} ${alignr}${color3}上行带宽:${color} ${upspeed wlan0}
+${color1}${downspeedgraph wlan0 25,140} ${alignr}${color1}${upspeedgraph wlan0 25,140}
+${color2}${hr 1}
+${color3}${font Inter:bold:size=${fontSizeBase}}实时天气资讯 (WEATHER):${font}
+${color3}定位城市:${color} ${alignr}Helsinki, Finland
+${color3}气象状态:${color} ${alignr}Cloudy & Cold
+${color3}当前温度:${color} ${alignr}21°C
+
+${color2}${hr 1}
+${font Fira Code:size=${expr 11 - 2}}${color1}系统最消耗资源进程:
+${color3} 进程代号  进程名称      CPU%    MEM%
+${color} ${top pid 1}  ${top name 1}  ${top cpu 1}  ${top mem 1}
+${color} ${top pid 2}  ${top name 2}  ${top cpu 2}  ${top mem 2}
+${color} ${top pid 3}  ${top name 3}  ${top cpu 3}  ${top mem 3}
+${font}
+]]

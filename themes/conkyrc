@@ -1,0 +1,43 @@
+conky.config = {
+    alignment = 'top_right',
+    background = true,
+    double_buffer = true,
+    font = 'DejaVu Sans Mono:size=11',
+    gap_x = 30,
+    gap_y = 40,
+    minimum_height = 300,
+    minimum_width = 280,
+    no_buffers = true,
+    own_window = true,
+    own_window_class = 'Conky',
+    own_window_type = 'normal',
+    own_window_transparent = false,
+    own_window_argb_visual = true,
+    own_window_argb_value = 180,
+    own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager',
+    use_xft = true,
+    update_interval = 1.0,
+}
+
+conky.text = [[
+${color #aaaaaa}${font DejaVu Sans Mono:bold:size=14}SYSTEM ${hr 2}${font}${color}
+${color #888888}Hostname:${color #aaaaaa} $nodename
+${color #888888}Kernel:${color #aaaaaa} $sysname $kernel
+${color #888888}Uptime:${color #aaaaaa} $uptime
+
+${color #aaaaaa}${font DejaVu Sans Mono:bold:size=14}CPU ${hr 2}${font}${color}
+${color #888888}CPU Usage:${color #aaaaaa} $cpu%
+${cpubar 4}
+
+${color #aaaaaa}${font DejaVu Sans Mono:bold:size=14}MEMORY ${hr 2}${font}${color}
+${color #888888}RAM:${color #aaaaaa} $mem / $memmax ($memperc%)
+${membar 4}
+
+${color #aaaaaa}${font DejaVu Sans Mono:bold:size=14}DISK ${hr 2}${font}${color}
+${color #888888}Root:${color #aaaaaa} ${fs_used /} / ${fs_size /} (${fs_used_perc /}%)
+${fs_bar 4 /}
+
+${color #aaaaaa}${font DejaVu Sans Mono:bold:size=14}NETWORK ${hr 2}${font}${color}
+${color #888888}IP (wlo1):${color #aaaaaa} ${addr wlo1}
+${color #888888}Down:${color #aaaaaa} ${downspeed wlo1} ${color #888888}Up:${color #aaaaaa} ${upspeed wlo1}
+]]

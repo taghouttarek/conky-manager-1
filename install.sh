@@ -21,6 +21,13 @@ mkdir -p "$ICON_DIR"
 cp "$(dirname "$0")/conky_manager.py" "$INSTALL_DIR/conky_manager.py"
 chmod +x "$INSTALL_DIR/conky_manager.py"
 
+# Copy themes
+if [ -d "$(dirname "$0")/themes" ]; then
+    mkdir -p "$HOME/.config/conky"
+    cp -r "$(dirname "$0")/themes/"* "$HOME/.config/conky/"
+    echo "Themes installed to ~/.config/conky/"
+fi
+
 # Copy icon
 if [ -f "$(dirname "$0")/icon.svg" ]; then
     cp "$(dirname "$0")/icon.svg" "$INSTALL_DIR/icon.svg"

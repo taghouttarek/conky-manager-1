@@ -1,0 +1,86 @@
+--[[
+  Wonderful modern Conky theme
+  Dependencies: conky-all, Lua cairo, optional fonts (Inter, Fira Code)
+  Place this file at: ~/.conky/modern/conkyrc
+--]]
+
+conky.config = {
+    -- Window settings
+    own_window = true,
+    own_window_type = 'dock',
+    own_window_transparent = false,
+    own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager',
+    own_window_colour = '000000',
+    own_window_argb_visual = true,
+    own_window_argb_value = 0,
+
+    double_buffer = true,
+    out_to_console = false,
+    out_to_x = true,
+
+    -- Position and size
+    alignment = 'top_right',
+    gap_x = 50,
+    gap_y = 60,
+    minimum_width = 320,
+    minimum_height = 620,
+
+    -- Font & text
+    use_xft = true,
+    font = 'Inter:size=10:weight=bold',
+    xftalpha = 1,
+    override_utf8_locale = true,
+    text_buffer_size = 2048,
+    short_units = true,
+    pad_percents = 2,
+
+    -- Colors (Nord palette inspired)
+    default_color = '#D8DEE9',
+    color0 = '#81A1C1',
+    color1 = '#88C0D0',
+    color2 = '#BF616A',
+    color3 = '#A3BE8C',
+    color4 = '#EBCB8B',
+    color5 = '#B48EAD',
+
+    -- Update interval
+    update_interval = 1.0,
+    cpu_avg_samples = 2,
+    net_avg_samples = 2,
+};
+
+conky.text = [[
+# ---- HEADER ----
+${voffset 10}${font Inter:size=24:bold}${color0}${time %H:%M}${font}${color}
+${voffset 5}${font Inter:size=11:bold}${time %A, %d %B %Y}${font}
+${voffset 10}${color1}${hr 1}${color}
+
+# ---- SYSTEM ----
+${voffset 15}${font Inter:size=10:bold}${color1}CPU${font}${alignr}${color}${cpu}%
+${voffset 3}${cpubar 6,}
+${voffset 10}${font Inter:size=10:bold}${color1}RAM${font}${alignr}${color}${memperc}%
+${voffset 3}${membar 6,}
+${voffset 10}${font Inter:size=10:bold}${color1}DISK /${font}${alignr}${color}${fs_used_perc /}%
+${voffset 3}${fs_bar 6,200 /}
+
+# ---- NETWORK ----
+${voffset 15}${color1}${hr 1}${color}
+${voffset 8}${font Inter:size=10:bold}${color3}NETWORK${font}${color}
+${voffset 5}${color3}↓${color} ${downspeed wlp2s0}${alignr}${color3}↑${color} ${upspeed wlp2s0}
+${voffset 2}${downspeedgraph wlp2s0 20,140 88C0D0 88C0D0} ${alignr}${upspeedgraph wlp2s0 20,140 88C0D0 88C0D0}
+${voffset 2}${color1}Local IP:${color} ${addr wlp2s0}${alignr}${color1}Public:${color} ${execi 300 curl -s ifconfig.me}
+
+# ---- TOP PROCESSES ----
+${voffset 15}${color1}${hr 1}${color}
+${voffset 8}${font Inter:size=10:bold}${color1}TOP PROCESSES${font}${color}
+${voffset 5}${font Fira Code:size=9:bold}${color3} 1. ${top name 1}${alignr}${top cpu 1}%${color}
+${voffset 2}${color} 2. ${top name 2}${alignr}${top cpu 2}%
+${voffset 2} 3. ${top name 3}${alignr}${top cpu 3}%
+${voffset 2} 4. ${top name 4}${alignr}${top cpu 4}%
+${voffset 2} 5. ${top name 5}${alignr}${top cpu 5}%${font}
+
+# ---- CALENDAR ----
+${voffset 15}${color1}${hr 1}${color}
+${voffset 8}${font Inter:size=10:bold}${color1}${execi 300 date +"%B %Y" | tr '[:lower:]' '[:upper:]'}${font}${color}
+${voffset 5}${font Fira Code:size=9}${execpi 300 cal | sed "s/^/ /;s/$/ /;s/ $(date +%e) / \${color2}$(date +%e)\${color} /"}${font}
+]]

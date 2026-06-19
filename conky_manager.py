@@ -78,6 +78,7 @@ class ConkyManager:
             "current_theme": None,
             "autostart_enabled": False,
             "window_position": {"x": 100, "y": 100},
+            "running_themes": [],
         }
 
     def save_settings(self):
@@ -187,18 +188,23 @@ class ConkyManager:
 
     def start_conky(self, theme):
         """Start conky with a specific theme"""
-        self.stop_conky()
-
         config_path = theme['config']
         if not os.path.exists(config_path):
             self.log(f"Config file not found: {config_path}")
             return False
 
+        # Check if this theme is already running
+        if self.is_theme_running(theme):
+            self.log(f"Theme already running: {theme['name']}")
+            return True
+
         try:
             cmd = ['conky', '-c', config_path, '-d']
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            self.current_theme = theme['name']
-            self.settings['current_theme'] = theme['name']
+            if 'running_themes' not in self.settings:
+                self.settings['running_themes'] = []
+            if theme['name'] not in self.settings['running_themes']:
+                self.settings['running_themes'].append(theme['name'])
             self.save_settings()
             self.log(f"Started conky with theme: {theme['name']}")
             return True
@@ -206,14 +212,42 @@ class ConkyManager:
             self.log(f"Error starting conky: {e}")
             return False
 
+    def stop_theme(self, theme):
+        """Stop a specific conky theme"""
+        try:
+            # Find and kill conky processes running this theme's config
+            result = subprocess.run(['pgrep', '-f', theme['config']], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                for pid in result.stdout.strip().split('\n'):
+                    if pid:
+                        subprocess.run(['kill', pid], capture_output=True, timeout=5)
+            if 'running_themes' in self.settings and theme['name'] in self.settings['running_themes']:
+                self.settings['running_themes'].remove(theme['name'])
+                self.save_settings()
+            self.log(f"Stopped theme: {theme['name']}")
+            return True
+        except (subprocess.TimeoutExpired, Exception) as e:
+            self.log(f"Error stopping theme: {e}")
+            return False
+
     def stop_conky(self):
         """Stop all conky instances"""
         try:
             subprocess.run(['pkill', 'conky'], capture_output=True, timeout=5)
+            self.settings['running_themes'] = []
+            self.save_settings()
             self.log("Stopped conky")
             return True
         except (subprocess.TimeoutExpired, Exception) as e:
             self.log(f"Error stopping conky: {e}")
+            return False
+
+    def is_theme_running(self, theme):
+        """Check if a specific theme is running"""
+        try:
+            result = subprocess.run(['pgrep', '-f', theme['config']], capture_output=True, text=True, timeout=5)
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, Exception):
             return False
 
     def is_conky_running(self):
@@ -503,7 +537,10 @@ class ConkyManagerGUI:
         self.run_btn = ttk.Button(button_frame, text="Run Theme", command=self.run_theme, state=tk.DISABLED)
         self.run_btn.pack(side=tk.LEFT, padx=2)
 
-        self.stop_btn = ttk.Button(button_frame, text="Stop Conky", command=self.stop_conky)
+        self.stop_theme_btn = ttk.Button(button_frame, text="Stop Theme", command=self.stop_theme, state=tk.DISABLED)
+        self.stop_theme_btn.pack(side=tk.LEFT, padx=2)
+
+        self.stop_btn = ttk.Button(button_frame, text="Stop All", command=self.stop_conky)
         self.stop_btn.pack(side=tk.LEFT, padx=2)
 
         ttk.Separator(button_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
@@ -537,13 +574,13 @@ class ConkyManagerGUI:
         self.manager.scan_themes()
 
         for theme in self.manager.themes:
-            is_current = theme['name'] == self.manager.current_theme
-            status = "Running" if is_current else ""
+            is_running = self.manager.is_theme_running(theme)
+            status = "Running" if is_running else ""
             lua = "Yes" if theme['has_lua'] else "No"
             self.tree.insert('', tk.END, values=(theme['name'], theme['type'], lua, status),
-                           tags=('current' if is_current else '',))
+                           tags=('running' if is_running else '',))
 
-        self.tree.tag_configure('current', foreground='green')
+        self.tree.tag_configure('running', foreground='green')
 
     def on_theme_select(self, event):
         """Handle theme selection"""
@@ -559,6 +596,10 @@ class ConkyManagerGUI:
                 self.folder_btn.config(state=tk.NORMAL)
                 self.delete_btn.config(state=tk.NORMAL)
                 self.autostart_check.config(state=tk.NORMAL)
+
+                # Enable/disable stop theme button based on running status
+                is_running = self.manager.is_theme_running(self.selected_theme)
+                self.stop_theme_btn.config(state=tk.NORMAL if is_running else tk.DISABLED)
 
                 # Check if autostart
                 autostart_theme = self.manager.get_autostart_theme()
@@ -591,14 +632,22 @@ class ConkyManagerGUI:
             if self.manager.start_conky(self.selected_theme):
                 self.update_status()
                 self.refresh_theme_list()
-                messagebox.showinfo("Success", f"Theme '{self.selected_theme['name']}' started!")
+                self.stop_theme_btn.config(state=tk.NORMAL)
+
+    def stop_theme(self):
+        """Stop the selected theme"""
+        if self.selected_theme:
+            if self.manager.stop_theme(self.selected_theme):
+                self.update_status()
+                self.refresh_theme_list()
+                self.stop_theme_btn.config(state=tk.DISABLED)
 
     def stop_conky(self):
-        """Stop conky"""
+        """Stop all conky instances"""
         self.manager.stop_conky()
-        self.manager.current_theme = None
         self.update_status()
         self.refresh_theme_list()
+        self.stop_theme_btn.config(state=tk.DISABLED)
 
     def edit_theme(self):
         """Edit the selected theme"""
