@@ -466,6 +466,7 @@ class ConkyManagerGUI:
 
         self.setup_ui()
         self.refresh_theme_list()
+        self.auto_refresh()
 
     def set_window_icon(self):
         """Set the window icon"""
@@ -573,6 +574,11 @@ class ConkyManagerGUI:
 
         self.info_text = scrolledtext.ScrolledText(info_frame, height=4, wrap=tk.WORD, state=tk.DISABLED)
         self.info_text.pack(fill=tk.X)
+
+    def auto_refresh(self):
+        """Auto-refresh theme list every 3 seconds"""
+        self.refresh_theme_list()
+        self.root.after(3000, self.auto_refresh)
 
     def refresh_theme_list(self):
         """Refresh the theme list"""
@@ -683,6 +689,7 @@ class ConkyManagerGUI:
         """Toggle autostart for the selected theme"""
         if self.selected_theme:
             self.manager.set_autostart(self.selected_theme, self.autostart_var.get())
+            self.refresh_theme_list()
 
     def import_archive(self):
         """Import a theme from an archive"""
