@@ -1,19 +1,15 @@
 -- System Widgets - Network, Processes, Docker, K8s
--- Created: 2026-06-19
+-- Styled to match Conky-Revisited-2 theme
 
 require 'cairo'
 
--- Colors (matching other themes)
+-- Colors (matching Revisited-2 theme)
 HTML_color = "#FFFFFF"
-HTML_color_active = "#FFFFFF"
-HTML_color_dim = "#888888"
-HTML_color_accent = "#4FC3F7"
-HTML_color_docker = "#2196F3"
-HTML_color_k8s = "#326CE5"
-
-transparency = 0.7
-transparency_active = 0.95
-transparency_dim = 0.5
+HTML_color_border = "#FFFFFF"
+transparency_bg = 0.6
+transparency_border = 0.1
+transparency_active = 0.9
+transparency_dim = 0.4
 
 function hex2rgb(hex)
     hex = hex:gsub("#","")
@@ -21,26 +17,24 @@ function hex2rgb(hex)
 end
 
 r, g, b = hex2rgb(HTML_color)
-r_a, g_a, b_a = hex2rgb(HTML_color_active)
-r_d, g_d, b_d = hex2rgb(HTML_color_dim)
-r_acc, g_acc, b_acc = hex2rgb(HTML_color_accent)
-r_doc, g_doc, b_doc = hex2rgb(HTML_color_docker)
-r_k8s, g_k8s, b_k8s = hex2rgb(HTML_color_k8s)
+r_border, g_border, b_border = hex2rgb(HTML_color_border)
 
-function draw_rounded_rect(cr, x, y, w, h, radius, r, g, b, trans)
-    cairo_set_operator(cr, CAIRO_OPERATOR_OVER)
+function draw_square(cr, x, y, w, h, r, g, b, trans)
+    cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE)
     cairo_set_source_rgba(cr, r, g, b, trans)
     cairo_set_line_width(cr, 2)
-    cairo_arc(cr, x+radius, y+radius, radius, math.pi, 1.5*math.pi)
-    cairo_arc(cr, x+w-radius, y+radius, radius, 1.5*math.pi, 2*math.pi)
-    cairo_arc(cr, x+w-radius, y+h-radius, radius, 0, 0.5*math.pi)
-    cairo_arc(cr, x+radius, y+h-radius, radius, 0.5*math.pi, math.pi)
-    cairo_close_path(cr)
+    cairo_rectangle(cr, x, y, w, h)
     cairo_fill(cr)
+
+    -- Border
+    cairo_set_source_rgba(cr, r_border, g_border, b_border, transparency_border)
+    cairo_set_line_width(cr, 1)
+    cairo_rectangle(cr, x, y, w, h)
+    cairo_stroke(cr)
 end
 
 function draw_text(cr, x, y, text, font_size, r, g, b, trans)
-    cairo_set_operator(cr, CAIRO_OPERATOR_OVER)
+    cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE)
     cairo_set_source_rgba(cr, r, g, b, trans)
     cairo_set_font_size(cr, font_size)
     cairo_move_to(cr, x, y)
@@ -48,13 +42,16 @@ function draw_text(cr, x, y, text, font_size, r, g, b, trans)
 end
 
 function draw_network_info(cr, x, y)
+    -- Background
+    draw_square(cr, x, y, 200, 150, r, g, b, transparency_bg)
+
     -- Title
-    draw_text(cr, x, y, "NETWORK INFO", 10, r_acc, g_acc, b_acc, transparency_active)
-    y = y + 20
+    draw_text(cr, x + 10, y + 20, "NETWORK", 10, r, g, b, transparency_active)
+    y = y + 35
 
     -- Interface
     local iface = conky_parse('${if_existing /sys/class/net/wlp2s0}wlp2s0${else}enp1s0f0${endif}')
-    draw_text(cr, x, y, "Interface: " .. iface, 9, r, g, b, transparency)
+    draw_text(cr, x + 10, y, "Iface: " .. iface, 9, r, g, b, transparency_dim)
     y = y + 18
 
     -- Local IP
@@ -62,12 +59,12 @@ function draw_network_info(cr, x, y)
     if local_ip == "" then
         local_ip = conky_parse('${addr enp1s0f0}')
     end
-    draw_text(cr, x, y, "Local IP: " .. local_ip, 9, r, g, b, transparency)
+    draw_text(cr, x + 10, y, "Local: " .. local_ip, 9, r, g, b, transparency_dim)
     y = y + 18
 
     -- External IP
     local ext_ip = conky_parse('${exec curl -s --max-time 3 ifconfig.me 2>/dev/null || echo "N/A"}')
-    draw_text(cr, x, y, "External IP: " .. ext_ip, 9, r, g, b, transparency)
+    draw_text(cr, x + 10, y, "Ext: " .. ext_ip, 9, r, g, b, transparency_dim)
     y = y + 18
 
     -- Download speed
@@ -75,7 +72,7 @@ function draw_network_info(cr, x, y)
     if down == "0B/s" then
         down = conky_parse('${downspeed enp1s0f0}')
     end
-    draw_text(cr, x, y, "↓ " .. down, 9, r_a, g_a, b_a, transparency_active)
+    draw_text(cr, x + 10, y, "↓ " .. down, 10, r, g, b, transparency_active)
     y = y + 18
 
     -- Upload speed
@@ -83,136 +80,125 @@ function draw_network_info(cr, x, y)
     if up == "0B/s" then
         up = conky_parse('${upspeed enp1s0f0}')
     end
-    draw_text(cr, x, y, "↑ " .. up, 9, r_a, g_a, b_a, transparency_active)
-    y = y + 18
-
-    -- Total downloaded
-    local total_down = conky_parse('${totaldown wlp2s0}')
-    if total_down == "0B" then
-        total_down = conky_parse('${totaldown enp1s0f0}')
-    end
-    draw_text(cr, x, y, "Total ↓: " .. total_down, 8, r_d, g_d, b_d, transparency_dim)
+    draw_text(cr, x + 10, y, "↑ " .. up, 10, r, g, b, transparency_active)
 
     return y + 20
 end
 
-function draw_network_bandwidth(cr, x, y, w, h)
+function draw_network_bandwidth(cr, x, y)
+    local w, h = 280, 120
+
     -- Background
-    draw_rounded_rect(cr, x, y, w, h, 8, r, g, b, 0.15)
+    draw_square(cr, x, y, w, h, r, g, b, transparency_bg)
 
     -- Title
-    draw_text(cr, x + 10, y + 18, "BANDWIDTH", 10, r_acc, g_acc, b_acc, transparency_active)
+    draw_text(cr, x + 10, y + 20, "BANDWIDTH", 10, r, g, b, transparency_active)
+
+    -- Download
+    local down_speed = conky_parse('${downspeed wlp2s0}')
+    if down_speed == "0B/s" then
+        down_speed = conky_parse('${downspeed enp1s0f0}')
+    end
+    draw_text(cr, x + 10, y + 45, "↓ " .. down_speed, 11, r, g, b, transparency_active)
 
     -- Download bar
-    local down_speed = tonumber(conky_parse('${downspeed wlp2s0}')) or 0
-    if down_speed == 0 then
-        down_speed = tonumber(conky_parse('${downspeed enp1s0f0}')) or 0
+    local down_val = tonumber(conky_parse('${downspeedf wlp2s0}')) or 0
+    if down_val == 0 then
+        down_val = tonumber(conky_parse('${downspeedf enp1s0f0}')) or 0
     end
-    local max_speed = 100000000 -- 100MB/s
-    local down_pct = math.min(down_speed / max_speed, 1)
-    local bar_y = y + 35
+    local down_pct = math.min(down_val / 100, 1)
 
-    draw_text(cr, x + 10, bar_y, "↓ " .. conky_parse('${downspeed wlp2s0}'), 9, r_a, g_a, b_a, transparency_active)
-    bar_y = bar_y + 15
-
-    -- Download bar background
-    cairo_set_operator(cr, CAIRO_OPERATOR_OVER)
+    cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE)
     cairo_set_source_rgba(cr, r, g, b, 0.2)
-    cairo_rectangle(cr, x + 10, bar_y, w - 20, 8)
+    cairo_rectangle(cr, x + 10, y + 55, w - 20, 6)
     cairo_fill(cr)
 
-    -- Download bar fill
-    cairo_set_source_rgba(cr, r_acc, g_acc, b_acc, transparency_active)
-    cairo_rectangle(cr, x + 10, bar_y, (w - 20) * down_pct, 8)
+    cairo_set_source_rgba(cr, r, g, b, transparency_active)
+    cairo_rectangle(cr, x + 10, y + 55, (w - 20) * down_pct, 6)
     cairo_fill(cr)
-    bar_y = bar_y + 25
+
+    -- Upload
+    local up_speed = conky_parse('${upspeed wlp2s0}')
+    if up_speed == "0B/s" then
+        up_speed = conky_parse('${upspeed enp1s0f0}')
+    end
+    draw_text(cr, x + 10, y + 80, "↑ " .. up_speed, 11, r, g, b, transparency_active)
 
     -- Upload bar
-    local up_speed = tonumber(conky_parse('${upspeed wlp2s0}')) or 0
-    if up_speed == 0 then
-        up_speed = tonumber(conky_parse('${upspeed enp1s0f0}')) or 0
+    local up_val = tonumber(conky_parse('${upspeedf wlp2s0}')) or 0
+    if up_val == 0 then
+        up_val = tonumber(conky_parse('${upspeedf enp1s0f0}')) or 0
     end
-    local up_pct = math.min(up_speed / max_speed, 1)
+    local up_pct = math.min(up_val / 100, 1)
 
-    draw_text(cr, x + 10, bar_y, "↑ " .. conky_parse('${upspeed wlp2s0}'), 9, r_a, g_a, b_a, transparency_active)
-    bar_y = bar_y + 15
-
-    -- Upload bar background
-    cairo_set_operator(cr, CAIRO_OPERATOR_OVER)
+    cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE)
     cairo_set_source_rgba(cr, r, g, b, 0.2)
-    cairo_rectangle(cr, x + 10, bar_y, w - 20, 8)
+    cairo_rectangle(cr, x + 10, y + 90, w - 20, 6)
     cairo_fill(cr)
 
-    -- Upload bar fill
-    cairo_set_source_rgba(cr, 0.4, 0.8, 0.4, transparency_active)
-    cairo_rectangle(cr, x + 10, bar_y, (w - 20) * up_pct, 8)
+    cairo_set_source_rgba(cr, r, g, b, transparency_active)
+    cairo_rectangle(cr, x + 10, y + 90, (w - 20) * up_pct, 6)
     cairo_fill(cr)
 end
 
-function draw_top_processes(cr, x, y, w, h)
+function draw_top_processes(cr, x, y)
+    local w, h = 280, 200
+
     -- Background
-    draw_rounded_rect(cr, x, y, w, h, 8, r, g, b, 0.15)
+    draw_square(cr, x, y, w, h, r, g, b, transparency_bg)
 
     -- Title
-    draw_text(cr, x + 10, y + 18, "TOP PROCESSES", 10, r_acc, g_acc, b_acc, transparency_active)
+    draw_text(cr, x + 10, y + 20, "TOP PROCESSES", 10, r, g, b, transparency_active)
 
     -- Process list
-    local procs = conky_parse('${top name 1}|${top cpu 1}|${top mem 1}')
-    local proc_y = y + 38
+    local proc_y = y + 40
 
-    for i = 1, 8 do
+    for i = 1, 10 do
         local name = conky_parse('${top name ' .. i .. '}')
         local cpu = conky_parse('${top cpu ' .. i .. '}')
-        local mem = conky_parse('${top mem ' .. i .. '}')
 
         if name and name ~= "" then
             -- Truncate long names
-            if string.len(name) > 14 then
-                name = string.sub(name, 1, 12) .. ".."
+            if string.len(name) > 16 then
+                name = string.sub(name, 1, 14) .. ".."
             end
-            draw_text(cr, x + 10, proc_y, name, 8, r, g, b, transparency)
-            draw_text(cr, x + w - 50, proc_y, cpu .. "%", 8, r_a, g_a, b_a, transparency_active)
+            draw_text(cr, x + 10, proc_y, name, 9, r, g, b, transparency_dim)
+            draw_text(cr, x + w - 50, proc_y, cpu .. "%", 9, r, g, b, transparency_active)
             proc_y = proc_y + 16
         end
     end
 end
 
-function draw_docker_containers(cr, x, y, w, h)
+function draw_docker_containers(cr, x, y)
+    local w, h = 280, 160
+
     -- Background
-    draw_rounded_rect(cr, x, y, w, h, 8, r_doc, g_doc, b_doc, 0.15)
+    draw_square(cr, x, y, w, h, r, g, b, transparency_bg)
 
     -- Title
-    draw_text(cr, x + 10, y + 18, "DOCKER CONTAINERS", 10, r_doc, g_doc, b_doc, transparency_active)
+    draw_text(cr, x + 10, y + 20, "DOCKER", 10, r, g, b, transparency_active)
 
     -- Container list
-    local containers = conky_parse('${exec docker ps --format "{{.Names}}|{{.Status}}" 2>/dev/null || echo ""}')
-    local cont_y = y + 38
+    local containers = conky_parse('${exec docker ps --format "{{.Names}}" 2>/dev/null || echo ""}')
+    local cont_y = y + 40
     local count = 0
 
     if containers and containers ~= "" then
         for line in containers:gmatch("[^\n]+") do
-            local name, status = line:match("([^|]+)|([^|]+)")
-            if name and count < 6 then
+            local name = line:match("^%s*(.-)%s*$")
+            if name and name ~= "" and count < 7 then
                 -- Truncate long names
-                if string.len(name) > 18 then
-                    name = string.sub(name, 1, 16) .. ".."
+                if string.len(name) > 20 then
+                    name = string.sub(name, 1, 18) .. ".."
                 end
 
-                -- Status indicator
-                local status_color = {0.4, 0.8, 0.4} -- green
-                if status and string.find(status, "Up") then
-                    status_color = {0.4, 0.8, 0.4}
-                else
-                    status_color = {0.8, 0.4, 0.4} -- red
-                end
-
-                -- Status dot
-                cairo_set_operator(cr, CAIRO_OPERATOR_OVER)
-                cairo_set_source_rgba(cr, status_color[1], status_color[2], status_color[3], transparency_active)
+                -- Status dot (green for running)
+                cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE)
+                cairo_set_source_rgba(cr, 0.4, 0.8, 0.4, transparency_active)
                 cairo_arc(cr, x + 14, cont_y - 3, 3, 0, 2 * math.pi)
                 cairo_fill(cr)
 
-                draw_text(cr, x + 22, cont_y, name, 8, r, g, b, transparency)
+                draw_text(cr, x + 22, cont_y, name, 9, r, g, b, transparency_dim)
                 cont_y = cont_y + 16
                 count = count + 1
             end
@@ -220,47 +206,49 @@ function draw_docker_containers(cr, x, y, w, h)
     end
 
     if count == 0 then
-        draw_text(cr, x + 10, cont_y, "No containers running", 8, r_d, g_d, b_d, transparency_dim)
+        draw_text(cr, x + 10, cont_y, "No containers", 9, r, g, b, transparency_dim)
     end
 end
 
-function draw_k8s_context(cr, x, y, w, h)
+function draw_k8s_context(cr, x, y)
+    local w, h = 280, 130
+
     -- Background
-    draw_rounded_rect(cr, x, y, w, h, 8, r_k8s, g_k8s, b_k8s, 0.15)
+    draw_square(cr, x, y, w, h, r, g, b, transparency_bg)
 
     -- Title
-    draw_text(cr, x + 10, y + 18, "K8S CONTEXT", 10, r_k8s, g_k8s, b_k8s, transparency_active)
+    draw_text(cr, x + 10, y + 20, "K8S", 10, r, g, b, transparency_active)
 
     -- Current context
     local context = conky_parse('${exec kubectl config current-context 2>/dev/null || echo "N/A"}')
-    draw_text(cr, x + 10, y + 40, context, 11, r_a, g_a, b_a, transparency_active)
+    draw_text(cr, x + 10, y + 45, context, 12, r, g, b, transparency_active)
 
     -- Namespace
     local namespace = conky_parse('${exec kubectl config view --minify --output "jsonpath={..namespace}" 2>/dev/null || echo "default"}')
-    draw_text(cr, x + 10, y + 60, "NS: " .. namespace, 9, r, g, b, transparency)
+    draw_text(cr, x + 10, y + 65, "NS: " .. namespace, 9, r, g, b, transparency_dim)
 
-    -- Cluster info
+    -- Nodes
     local nodes = conky_parse('${exec kubectl get nodes --no-headers 2>/dev/null | wc -l || echo "0"}')
-    draw_text(cr, x + 10, y + 80, "Nodes: " .. nodes, 9, r, g, b, transparency)
+    draw_text(cr, x + 10, y + 85, "Nodes: " .. nodes, 9, r, g, b, transparency_dim)
 
-    -- Pods running
+    -- Pods
     local pods = conky_parse('${exec kubectl get pods --no-headers --all-namespaces 2>/dev/null | grep Running | wc -l || echo "0"}')
-    draw_text(cr, x + 10, y + 100, "Pods: " .. pods, 9, r, g, b, transparency)
+    draw_text(cr, x + 10, y + 105, "Pods: " .. pods, 9, r, g, b, transparency_dim)
 end
 
 function draw_function(cr)
     local w, h = conky_window.width, conky_window.height
 
-    -- Left side widgets (Network Info)
+    -- Left side (Network Info)
     draw_network_info(cr, 30, 50)
 
-    -- Center widget (Bandwidth)
-    draw_network_bandwidth(cr, 350, 50, 300, 160)
+    -- Center (Bandwidth)
+    draw_network_bandwidth(cr, 250, 50)
 
-    -- Right side widgets
-    draw_top_processes(cr, w - 350, 50, 320, 200)
-    draw_docker_containers(cr, w - 350, 270, 320, 160)
-    draw_k8s_context(cr, w - 350, 450, 320, 140)
+    -- Right side
+    draw_top_processes(cr, w - 310, 50)
+    draw_docker_containers(cr, w - 310, 270)
+    draw_k8s_context(cr, w - 310, 450)
 end
 
 function conky_start_widgets()
