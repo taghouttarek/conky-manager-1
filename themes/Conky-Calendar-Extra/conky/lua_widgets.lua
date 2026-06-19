@@ -235,12 +235,21 @@ function draw_function(cr)
   
   
 --- Clock ---
+  local hours = conky_parse('${exec date +%H}')
+  local minutes = conky_parse('${exec date +%M}')
+  local seconds = tonumber(conky_parse('${exec date +%S}'))
+  local colon_visible = (seconds % 2 == 0)
+  
   cairo_set_font_size(cr,42)
-  cairo_move_to(cr, (w-x_rel_pos)/2-54,(h-y_rel_pos)/2)
-  cairo_show_text(cr,conky_parse('${exec date +%H}') .. ":" .. conky_parse('${exec date +%M}'))
-  cairo_set_font_size(cr,12)
-  cairo_move_to(cr, (w-x_rel_pos)/2-24,(h-y_rel_pos)/2+14)
-  cairo_show_text(cr, "")
+  cairo_set_source_rgba(cr, r_c,g_c,b_c,transparency_active)
+  
+  if colon_visible then
+    cairo_move_to(cr, (w-x_rel_pos)/2-54,(h-y_rel_pos)/2)
+    cairo_show_text(cr, hours .. ":" .. minutes)
+  else
+    cairo_move_to(cr, (w-x_rel_pos)/2-54,(h-y_rel_pos)/2)
+    cairo_show_text(cr, hours .. " " .. minutes)
+  end
   
 
 --- Free space ---
