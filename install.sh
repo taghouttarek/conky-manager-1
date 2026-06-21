@@ -117,14 +117,12 @@ echo "Run with: $SCRIPT_NAME"
 echo "Or find 'Conky Manager' in your application menu"
 echo ""
 
-# Ask to delete the cloned repo
-echo ""
-read -p "Delete the cloned repo ($REPO_DIR)? (y/N): " delete_repo
-if [[ "$delete_repo" =~ ^[Yy]$ ]]; then
-    if [ "$REPO_DIR" != "$INSTALL_DIR" ]; then
-        $SUDO rm -rf "$REPO_DIR"
+# Ask to delete the cloned repo (skip if non-interactive)
+if [[ -t 0 ]] && [[ "$INSTALL_DIR" != "$REPO_DIR" ]]; then
+    echo ""
+    read -p "Delete the cloned repo ($REPO_DIR)? (y/N): " delete_repo
+    if [[ "$delete_repo" =~ ^[Yy]$ ]]; then
+        rm -rf "$REPO_DIR"
         echo "Repository deleted."
-    else
-        echo "Cannot delete - repo is the install directory."
     fi
 fi

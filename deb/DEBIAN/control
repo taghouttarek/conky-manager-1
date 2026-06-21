@@ -1,9 +1,10 @@
 Package: conky-manager
-Version: 2.0.3
+Version: 2.0.6
 Section: utils
 Priority: optional
 Architecture: all
 Depends: python3 (>= 3.8), python3-tk, conky, git
+Recommends: python3-pip
 Maintainer: taghouti <taghouti@users.noreply.github.com>
 Description: Conky Manager - Theme Manager for Conky
  A full-featured Python Conky Theme Manager with GUI.
