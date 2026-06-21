@@ -308,22 +308,26 @@ class LayoutEditor:
         for name, widget in self.widgets.items():
             theme_dir = conky_config / name
 
-            # Only update conkyrc gap_x/gap_y (position of conky window)
+            # Find and update any Lua file with position variables
+            for lua_file in theme_dir.rglob("*.lua"):
+                self.update_lua_position(lua_file, widget)
+                updated_themes.add(name)
+
+            # Update conkyrc (gap_x/gap_y)
             conkyrc = theme_dir / "conkyrc"
             if conkyrc.exists():
                 self.update_conkyrc_position(conkyrc, widget)
                 updated_themes.add(name)
 
-        # Restart updated themes so gap_x/gap_y changes take effect
         if updated_themes:
             self.restart_themes(updated_themes)
 
     def update_conkyrc_position(self, conkyrc, widget):
-        with open(conkyrc) as f:
+        target = conkyrc.resolve()
+        with open(target) as f:
             content = f.read()
 
         import re
-
         content = re.sub(
             r'(gap_x\s*=\s*)\d+',
             f'\\g<1>{int(widget.x)}',
@@ -335,9 +339,45 @@ class LayoutEditor:
             content
         )
 
-        with open(conkyrc, "w") as f:
+        with open(target, "w") as f:
             f.write(content)
         print(f"Updated {conkyrc}")
+
+    def update_lua_position(self, lua_file, widget):
+        target = lua_file.resolve()
+        with open(target) as f:
+            content = f.read()
+
+        import re
+
+        # Pattern: local widget_x = N (absolute)
+        content = re.sub(
+            r'(local\s+widget_x\s*=\s*)[\d.]+',
+            f'\\g<1>{int(widget.x)}',
+            content
+        )
+        # Pattern: local widget_y = N (absolute)
+        content = re.sub(
+            r'(local\s+widget_y\s*=\s*)[\d.]+',
+            f'\\g<1>{int(widget.y)}',
+            content
+        )
+        # Pattern: local x = N (standalone assignment)
+        content = re.sub(
+            r'(local\s+x\s*=\s*)\d+(?=\s*[;\n])',
+            f'\\g<1>{int(widget.x)}',
+            content
+        )
+        # Pattern: local y = N (standalone assignment)
+        content = re.sub(
+            r'(local\s+y\s*=\s*)\d+(?=\s*[;\n])',
+            f'\\g<1>{int(widget.y)}',
+            content
+        )
+
+        with open(target, "w") as f:
+            f.write(content)
+        print(f"Updated {lua_file}")
 
     def restart_themes(self, theme_names):
         import time

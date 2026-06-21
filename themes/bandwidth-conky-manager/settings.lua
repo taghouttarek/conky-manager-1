@@ -90,7 +90,7 @@ function draw_function(cr)
 
     local widget_h = 120
     local x = 30
-    local y = (h - widget_h) / 2
+    local y = 420
 
     draw_network_bandwidth(cr, x, y)
 end

@@ -85,7 +85,7 @@ end
 function draw_function(cr)
 	local w,h=conky_window.width,conky_window.height
 
-	local widget_x = w - 120
+	local widget_x = 1800
 	local widget_y = 20
 	local widget_w = 120
 	local widget_h = 120

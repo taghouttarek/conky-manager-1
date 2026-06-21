@@ -86,7 +86,7 @@ function draw_function(cr)
 
     local widget_h = 160
     local x = 30
-    local y = (h - widget_h) / 2
+    local y = 220
 
     draw_network_info(cr, x, y)
 end

@@ -89,8 +89,8 @@ function draw_function(cr)
     cairo_select_font_face(cr, "Dejavu Sans Book", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL)
 
     local widget_h = 140
-    local x = w - 280
-    local y = (h - widget_h) / 2
+    local x = 1640
+    local y = 718
 
     draw_k8s_context(cr, x, y)
 end
