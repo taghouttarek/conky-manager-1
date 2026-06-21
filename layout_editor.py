@@ -264,18 +264,18 @@ class LayoutEditor:
         toolbar = ctk.CTkFrame(self.root, fg_color="transparent")
         toolbar.pack(fill="x", padx=5, pady=5)
 
-        ctk.CTkButton(toolbar, text="Save", command=self.save, width=60).pack(side="left", padx=2)
-        ctk.CTkButton(toolbar, text="Reset", command=self.reset, width=60).pack(side="left", padx=2)
-        ctk.CTkButton(toolbar, text="Apply", command=self.apply_positions, width=60).pack(side="left", padx=2)
-        ctk.CTkButton(toolbar, text="Center All", command=self.center_all, width=80).pack(side="left", padx=2)
+        ctk.CTkButton(toolbar, text="Save", command=self.save, width=60, height=28).pack(side="left", padx=2)
+        ctk.CTkButton(toolbar, text="Reset", command=self.reset, width=60, height=28).pack(side="left", padx=2)
+        ctk.CTkButton(toolbar, text="Apply", command=self.apply_positions, width=60, height=28).pack(side="left", padx=2)
+        ctk.CTkButton(toolbar, text="Center All", command=self.center_all, width=80, height=28).pack(side="left", padx=2)
 
         sep1 = ctk.CTkFrame(toolbar, width=2, fg_color="gray40")
         sep1.pack(side="left", fill="y", padx=5, pady=5)
 
-        ctk.CTkButton(toolbar, text="-", command=self.zoom_out, width=30).pack(side="left", padx=2)
+        ctk.CTkButton(toolbar, text="-", command=self.zoom_out, width=30, height=28).pack(side="left", padx=2)
         self.zoom_label = ctk.CTkLabel(toolbar, text=f"{int(self.scale * 100)}%")
         self.zoom_label.pack(side="left", padx=2)
-        ctk.CTkButton(toolbar, text="+", command=self.zoom_in, width=30).pack(side="left", padx=2)
+        ctk.CTkButton(toolbar, text="+", command=self.zoom_in, width=30, height=28).pack(side="left", padx=2)
 
         self.mode_var = tk.StringVar(value="move")
         ctk.CTkRadioButton(toolbar, text="Move", variable=self.mode_var, value="move").pack(side="left", padx=10)
@@ -285,7 +285,7 @@ class LayoutEditor:
         sep2.pack(side="left", fill="y", padx=5, pady=5)
 
         # Detect button
-        ctk.CTkButton(toolbar, text="Detect", command=self._on_detect, width=60).pack(side="left", padx=2)
+        ctk.CTkButton(toolbar, text="Detect", command=self._on_detect, width=60, height=28).pack(side="left", padx=2)
 
         # Monitor dropdown
         self.monitor_var = tk.StringVar()
