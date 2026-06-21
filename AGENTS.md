@@ -3,7 +3,9 @@
 ## Overview
 This is a Conky theme manager repository containing:
 - `conky_manager.py` - Main manager application (Python/Tkinter)
+- `layout_editor.py` - Drag-and-drop layout editor for widget positioning
 - `themes/` - All conky themes
+- `tests/` - Non-regression test suite (70 tests)
 - `install.sh` / `uninstall.sh` - Installation scripts
 
 ## Key Rules
@@ -104,6 +106,17 @@ ${cpu}%
 - Layout editor resolves symlinks before writing
 - Layout editor scans all `.lua` files in theme dir for position variables
 - Auto-restart themes after applying positions
+
+### Code Review Fixes (v2.0.4)
+- Fixed `hex2rgb()` blue channel bug across all 9 themes (was dividing string by 255)
+- Added `os.setlocale("en_US.utf8", "numeric")` to 5 missing files
+- Fixed `update_num` nil dereference in 7 files (crashes on first conky update)
+- Fixed weather theme: `io.popen` leak → `os.getenv("HOME")`, nil concatenation guards
+- Fixed weather theme: global variables (`ct`, `day`) → local, memory leak in `cairo_text_extents_t`
+- Fixed docker theme: `size * 05` typo → `size * 0.05`
+- Layout editor: error handling per-theme, PID validation, file write guard (only writes when changed)
+- Layout editor: atomic file writes, UTF-8 encoding, corrupted JSON handling
+- Removed hardcoded developer path from `get_repo_path()`
 
 ## Adding New Themes
 

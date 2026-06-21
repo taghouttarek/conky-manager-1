@@ -186,6 +186,27 @@ All themes use the same positioning model:
 
 This ensures the same logic works for all themes (system widgets, calendar, weather, revisited, etc.).
 
+## Testing
+
+Non-regression test suite with 70 tests covering theme structure, Lua syntax, business logic, and layout editor.
+
+```bash
+# Install test dependencies
+pip3 install pytest pytest-cov
+
+# Run all tests
+pytest tests/ -v
+
+# Run with coverage
+pytest tests/ -v --cov=. --cov-report=term-missing
+
+# Run specific test file
+pytest tests/test_theme_structure.py -v
+pytest tests/test_lua_syntax.py -v
+pytest tests/test_layout_editor.py -v
+pytest tests/test_conky_manager.py -v
+```
+
 ## Uninstall
 
 ```bash
