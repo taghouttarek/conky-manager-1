@@ -311,6 +311,8 @@ class LayoutEditor:
         self.canvas.bind("<ButtonPress-1>", self.on_press)
         self.canvas.bind("<B1-Motion>", self.on_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_release)
+        self.canvas.tag_bind("center_h", "<Button-1>", self._on_center_h)
+        self.canvas.tag_bind("center_v", "<Button-1>", self._on_center_v)
 
     def _draw_grid(self):
         sw = int(self.screen_w * self.scale)
@@ -477,20 +479,6 @@ class LayoutEditor:
         items = self.canvas.find_overlapping(event.x - 5, event.y - 5, event.x + 5, event.y + 5)
         for item in items:
             tags = self.canvas.gettags(item)
-            if "center_h" in tags:
-                for tag in tags:
-                    if tag in self.widgets:
-                        w = self.widgets[tag]
-                        w.x = int((self.screen_w - w.w) / 2)
-                        w.update_position()
-                        return
-            if "center_v" in tags:
-                for tag in tags:
-                    if tag in self.widgets:
-                        w = self.widgets[tag]
-                        w.y = int((self.screen_h - w.h) / 2)
-                        w.update_position()
-                        return
             for tag in tags:
                 if tag in self.widgets:
                     self.selected = tag
@@ -498,6 +486,22 @@ class LayoutEditor:
                         self.mode_var.set("resize")
                     return
         self.selected = None
+
+    def _on_center_h(self, event):
+        for tag in self.canvas.gettags(self.canvas.find_closest(event.x, event.y)):
+            if tag in self.widgets:
+                w = self.widgets[tag]
+                w.x = int((self.screen_w - w.w) / 2)
+                w.update_position()
+                return
+
+    def _on_center_v(self, event):
+        for tag in self.canvas.gettags(self.canvas.find_closest(event.x, event.y)):
+            if tag in self.widgets:
+                w = self.widgets[tag]
+                w.y = int((self.screen_h - w.h) / 2)
+                w.update_position()
+                return
 
     def on_drag(self, event):
         if not self.selected or self.selected not in self.widgets:
