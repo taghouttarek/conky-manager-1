@@ -14,7 +14,7 @@ echo "=== Conky Manager Installer ==="
 # Clone repo to get all files
 echo "Downloading Conky Manager..."
 rm -rf "$CLONE_DIR"
-git clone --depth 1 "$REPO_URL" "$CLONE_DIR"
+git clone "$REPO_URL" "$CLONE_DIR"
 
 # Install files to /opt
 echo "Installing to $INSTALL_DIR..."

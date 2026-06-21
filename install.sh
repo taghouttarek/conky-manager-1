@@ -25,10 +25,15 @@ fi
 echo "Installing Python dependencies..."
 pip3 install customtkinter --break-system-packages 2>/dev/null || pip3 install customtkinter 2>/dev/null || echo "Warning: Could not install customtkinter automatically. Run: pip3 install customtkinter"
 
-# Install to /opt
+# Install to /opt (as git repo so update feature works)
 echo "Installing to $INSTALL_DIR..."
 $SUDO mkdir -p "$INSTALL_DIR"
-$SUDO cp -r "$REPO_DIR"/* "$INSTALL_DIR/"
+# Copy all files including .git
+$SUDO rsync -a --exclude='.git' "$REPO_DIR/" "$INSTALL_DIR/"
+# Copy .git separately to preserve it
+if [ -d "$REPO_DIR/.git" ]; then
+    $SUDO cp -r "$REPO_DIR/.git" "$INSTALL_DIR/.git"
+fi
 $SUDO chmod +x "$INSTALL_DIR/install.sh"
 $SUDO chmod +x "$INSTALL_DIR/uninstall.sh"
 if [ -f "$INSTALL_DIR/conky_manager.py" ]; then
