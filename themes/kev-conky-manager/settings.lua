@@ -129,8 +129,8 @@ function draw_function(cr)
     cairo_select_font_face(cr, "Dejavu Sans", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL)
 
     -- Right side, below system widgets
-    local widget_x = w - 280
-    local widget_y = 870
+    local widget_x = w - 994
+    local widget_y = 660
     draw_vuln_widget(cr, widget_x, widget_y)
 end
 

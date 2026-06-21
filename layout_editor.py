@@ -91,6 +91,17 @@ class LayoutEditor:
     def __init__(self, parent=None):
         self.standalone = parent is None
         self.root = tk.Tk() if self.standalone else tk.Toplevel(parent)
+
+        global SCREEN_W, SCREEN_H
+        try:
+            sw = self.root.winfo_screenwidth()
+            sh = self.root.winfo_screenheight()
+            if sw > 0 and sh > 0:
+                SCREEN_W = sw
+                SCREEN_H = sh
+        except Exception:
+            pass
+
         self.root.title("Conky Layout Editor")
         self.root.geometry(f"{int(SCREEN_W * SCALE) + 60}x{int(SCREEN_H * SCALE) + 120}")
         self.root.minsize(500, 400)
@@ -189,7 +200,7 @@ class LayoutEditor:
             "processes-conky-manager": {"x": 1670, "y": 300, "w": 250, "h": 220, "color": "#ff88ff"},
             "docker-conky-manager": {"x": 1670, "y": 540, "w": 250, "h": 180, "color": "#88ff88"},
             "k8s-conky-manager": {"x": 1670, "y": 740, "w": 250, "h": 140, "color": "#ffff44"},
-            "weather-conky-manager": {"x": 1520, "y": 50, "w": 400, "h": 400, "color": "#4488ff"},
+            "weather-conky-manager": {"x": 1800, "y": 20, "w": 80, "h": 80, "color": "#4488ff"},
             "calendar-conky-manager": {"x": 660, "y": 50, "w": 600, "h": 500, "color": "#44ff88"},
             "claude-conky-manager": {"x": 1520, "y": 470, "w": 300, "h": 300, "color": "#8888ff"},
             "revisited-conky-manager": {"x": 0, "y": 470, "w": 640, "h": 400, "color": "#884488"},
@@ -303,21 +314,80 @@ class LayoutEditor:
         with open(lua_file) as f:
             content = f.read()
 
-        # Find and replace widget_x and widget_y in draw_function
         import re
+
+        # Pattern 1a: local widget_x = w - N (right-aligned)
+        offset_x = SCREEN_W - widget.x
+        content = re.sub(
+            r'(local widget_x\s*=\s*w\s*-\s*)\d+',
+            f'\\g<1>{offset_x}',
+            content
+        )
+
+        # Pattern 1b: local widget_x = N (left-aligned)
         content = re.sub(
             r'(local widget_x\s*=\s*)\d+',
             f'\\g<1>{int(widget.x)}',
             content
         )
+
+        # Pattern 1c: local widget_y = N
         content = re.sub(
             r'(local widget_y\s*=\s*)\d+',
             f'\\g<1>{int(widget.y)}',
             content
         )
+
+        # Pattern 2: local w, h = N, N (widget size)
         content = re.sub(
             r'(local w\s*,\s*h\s*=\s*)\d+\s*,\s*\d+',
             f'\\g<1>{int(widget.w)}, {int(widget.h)}',
+            content
+        )
+
+        # Pattern 3a: local x = w - N (right-aligned system widgets)
+        offset_x = SCREEN_W - widget.x
+        content = re.sub(
+            r'(local x\s*=\s*w\s*-\s*)\d+',
+            f'\\g<1>{offset_x}',
+            content
+        )
+
+        # Pattern 3b: local x = N (left-aligned system widgets)
+        content = re.sub(
+            r'(local x\s*=\s*)\d+(?!\s*\+)',
+            f'\\g<1>{int(widget.x)}',
+            content
+        )
+
+        # Pattern 4: local y = (h - widget_h) / 2 (system widgets - center vertically)
+        center_y = widget.y + widget.h // 2
+        content = re.sub(
+            r'(local y\s*=\s*\(h\s*-\s*widget_h\s*\)\s*/\s*2)',
+            f'local y = {center_y} - widget_h / 2',
+            content
+        )
+
+        # Pattern 5: local widget_h = N
+        content = re.sub(
+            r'(local widget_h\s*=\s*)\d+',
+            f'\\g<1>{int(widget.h)}',
+            content
+        )
+
+        # Pattern 6: pos_x = w-N (weather - right-aligned)
+        offset_x = SCREEN_W - widget.x
+        content = re.sub(
+            r'(local pos_x\s*=\s*w\s*-\s*)\d+',
+            f'\\g<1>{offset_x}',
+            content
+        )
+
+        # Pattern 7: pos_y = N (weather)
+        center_y = widget.y + widget.h // 2
+        content = re.sub(
+            r'(local pos_y\s*=\s*)\d+',
+            f'\\g<1>{center_y}',
             content
         )
 

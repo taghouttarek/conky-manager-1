@@ -62,7 +62,12 @@ echo "Themes installed to ~/.config/conky/"
 mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/$SCRIPT_NAME" << 'EOF'
 #!/bin/bash
-exec python3 "/opt/conky-manager/conky_manager.py" "$@"
+LOCAL_APP="$HOME/.local/share/conky-manager/conky_manager.py"
+if [ -f "$LOCAL_APP" ]; then
+    exec python3 "$LOCAL_APP" "$@"
+else
+    exec python3 "/opt/conky-manager/conky_manager.py" "$@"
+fi
 EOF
 chmod +x "$BIN_DIR/$SCRIPT_NAME"
 
