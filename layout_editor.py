@@ -4,12 +4,13 @@ import tkinter as tk
 from tkinter import ttk
 import json
 import os
+import subprocess
 from pathlib import Path
 
 LAYOUT_FILE = Path.home() / ".config" / "conky" / "layout.json"
 SCREEN_W = 1920
 SCREEN_H = 1080
-SCALE = 0.4  # Canvas scale factor
+SCALE = 0.5  # Canvas scale factor (adjusted by zoom)
 
 
 def load_layout():
@@ -88,20 +89,24 @@ class WidgetRect:
 
 class LayoutEditor:
     def __init__(self, parent=None):
-        self.root = tk.Toplevel(parent) if parent else tk.Tk()
+        self.standalone = parent is None
+        self.root = tk.Tk() if self.standalone else tk.Toplevel(parent)
         self.root.title("Conky Layout Editor")
-        self.root.geometry(f"{int(SCREEN_W * SCALE) + 40}x{int(SCREEN_H * SCALE) + 120}")
+        self.root.geometry(f"{int(SCREEN_W * SCALE) + 60}x{int(SCREEN_H * SCALE) + 120}")
+        self.root.minsize(500, 400)
 
         self.widgets = {}
         self.selected = None
-        self.mode = "move"  # "move" or "resize"
+        self.mode = "move"
         self.drag_data = {"x": 0, "y": 0}
 
         self.setup_ui()
         self.load_widgets()
-        self.root.mainloop()
+        if self.standalone:
+            self.root.mainloop()
 
     def setup_ui(self):
+        global SCALE
         # Toolbar
         toolbar = ttk.Frame(self.root)
         toolbar.pack(fill=tk.X, padx=5, pady=5)
@@ -109,6 +114,13 @@ class LayoutEditor:
         ttk.Button(toolbar, text="Save", command=self.save).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar, text="Reset", command=self.reset).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar, text="Apply", command=self.apply_positions).pack(side=tk.LEFT, padx=2)
+
+        ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+
+        ttk.Button(toolbar, text="-", command=self.zoom_out, width=3).pack(side=tk.LEFT, padx=2)
+        self.zoom_label = ttk.Label(toolbar, text=f"{int(SCALE * 100)}%")
+        self.zoom_label.pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="+", command=self.zoom_in, width=3).pack(side=tk.LEFT, padx=2)
 
         self.mode_var = tk.StringVar(value="move")
         ttk.Radiobutton(toolbar, text="Move", variable=self.mode_var, value="move").pack(side=tk.LEFT, padx=10)
@@ -142,15 +154,47 @@ class LayoutEditor:
         self.canvas.bind("<B1-Motion>", self.on_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_release)
 
+    def get_running_themes(self):
+        """Get list of currently running theme directory names"""
+        running = set()
+        try:
+            result = subprocess.run(['pgrep', '-a', 'conky'], capture_output=True, text=True, timeout=5)
+            for line in result.stdout.splitlines():
+                parts = line.split()
+                if len(parts) > 1:
+                    # Find -c argument
+                    for i, part in enumerate(parts):
+                        if part == '-c' and i + 1 < len(parts):
+                            config_path = parts[i + 1]
+                            # Extract theme name from path like /home/user/.config/conky/theme-name/conkyrc
+                            parts_path = config_path.split('/')
+                            if 'conky' in parts_path:
+                                idx = parts_path.index('conky')
+                                if idx + 1 < len(parts_path):
+                                    theme_dir = parts_path[idx + 1]
+                                    running.add(theme_dir)
+        except Exception:
+            pass
+        return running
+
     def load_widgets(self):
         layout = load_layout()
+        running = self.get_running_themes()
         default_widgets = {
-            "crypto": {"x": 30, "y": 720, "w": 250, "h": 250, "color": "#e94560"},
-            "kev": {"x": 1640, "y": 870, "w": 250, "h": 250, "color": "#ff4444"},
-            "infra": {"x": 30, "y": 980, "w": 250, "h": 250, "color": "#ff8800"},
+            "crypto-tracker": {"x": 30, "y": 720, "w": 250, "h": 250, "color": "#e94560"},
+            "security-vulns": {"x": 1640, "y": 870, "w": 250, "h": 250, "color": "#ff4444"},
+            "infra-vulns": {"x": 30, "y": 980, "w": 250, "h": 250, "color": "#ff8800"},
+            "Conky-Weather": {"x": 1520, "y": 50, "w": 400, "h": 400, "color": "#4488ff"},
+            "Conky-Calendar-Extra": {"x": 660, "y": 50, "w": 600, "h": 500, "color": "#44ff88"},
+            "claude": {"x": 1520, "y": 470, "w": 300, "h": 300, "color": "#8888ff"},
+            "modern": {"x": 1180, "y": 470, "w": 320, "h": 300, "color": "#ff88ff"},
+            "system-widgets": {"x": 0, "y": 50, "w": 640, "h": 400, "color": "#444488"},
+            "Conky_Revisited_2": {"x": 0, "y": 470, "w": 640, "h": 400, "color": "#884488"},
         }
 
         for name, defaults in default_widgets.items():
+            if name not in running:
+                continue
             pos = layout.get(name, defaults)
             self.widgets[name] = WidgetRect(
                 self.canvas, name,
@@ -192,6 +236,41 @@ class LayoutEditor:
     def on_release(self, event):
         self.drag_data = {"x": 0, "y": 0}
 
+    def zoom_in(self):
+        global SCALE
+        SCALE = min(1.5, SCALE + 0.1)
+        self.redraw_canvas()
+
+    def zoom_out(self):
+        global SCALE
+        SCALE = max(0.2, SCALE - 0.1)
+        self.redraw_canvas()
+
+    def redraw_canvas(self):
+        self.zoom_label.config(text=f"{int(SCALE * 100)}%")
+        # Save current positions
+        saved = {}
+        for name, w in self.widgets.items():
+            saved[name] = (w.x, w.y, w.w, w.h, w.color)
+        # Resize canvas
+        new_w = int(SCREEN_W * SCALE)
+        new_h = int(SCREEN_H * SCALE)
+        self.canvas.config(width=new_w, height=new_h)
+        self.root.geometry(f"{new_w + 60}x{new_h + 120}")
+        # Clear and redraw
+        self.canvas.delete("all")
+        # Grid lines
+        for x in range(0, SCREEN_W, 100):
+            sx = x * SCALE
+            self.canvas.create_line(sx, 0, sx, new_h, fill="#333333", dash=(2, 4))
+        for y in range(0, SCREEN_H, 100):
+            sy = y * SCALE
+            self.canvas.create_line(0, sy, new_w, sy, fill="#333333", dash=(2, 4))
+        # Redraw widgets
+        self.widgets.clear()
+        for name, (x, y, w, h, color) in saved.items():
+            self.widgets[name] = WidgetRect(self.canvas, name, x, y, w, h, color)
+
     def save(self):
         layout = {}
         for name, widget in self.widgets.items():
@@ -201,8 +280,10 @@ class LayoutEditor:
 
     def reset(self):
         for name in self.widgets:
-            self.canvas.delete(name)
-            self.canvas.delete(f"{name}_label")
+            w = self.widgets[name]
+            self.canvas.delete(w.rect)
+            self.canvas.delete(w.label)
+            self.canvas.delete(w.resize_handle)
         self.widgets.clear()
         self.load_widgets()
 
@@ -212,11 +293,6 @@ class LayoutEditor:
         conky_config = Path.home() / ".config" / "conky"
         for name, widget in self.widgets.items():
             lua_file = conky_config / name / "settings.lua"
-            if not lua_file.exists():
-                # Try alternate names
-                alt_names = {"kev": "security-vulns", "infra": "infra-vulns"}
-                if name in alt_names:
-                    lua_file = conky_config / alt_names[name] / "settings.lua"
             if lua_file.exists():
                 self.update_lua_position(lua_file, widget)
 
