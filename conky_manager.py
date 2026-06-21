@@ -519,6 +519,9 @@ class ConkyManagerGUI:
         ttk.Button(toolbar_frame, text="Layout", command=self.open_layout_editor).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar_frame, text="Open ~/.conky", command=self.open_conky_dir).pack(side=tk.LEFT, padx=2)
 
+        ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+        ttk.Button(toolbar_frame, text="Restart Manager", command=self.restart_manager).pack(side=tk.RIGHT, padx=2)
+
         # Theme list
         list_frame = ttk.Frame(main_frame)
         list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
@@ -758,6 +761,12 @@ class ConkyManagerGUI:
     def open_layout_editor(self):
         """Open the layout editor"""
         layout_editor.LayoutEditor(self.root)
+
+    def restart_manager(self):
+        """Restart the manager"""
+        python = sys.executable
+        self.root.destroy()
+        os.execv(python, [python] + sys.argv)
 
     def import_archive(self):
         """Import a theme from an archive"""
