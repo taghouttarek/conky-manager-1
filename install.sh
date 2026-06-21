@@ -3,36 +3,40 @@
 
 set -e
 
-INSTALL_DIR="$HOME/.local/share/conky-manager"
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+INSTALL_DIR="/opt/conky-manager"
+LOCAL_DIR="$HOME/.local/share/conky-manager"
 BIN_DIR="$HOME/.local/bin"
 SCRIPT_NAME="conky-manager"
 DESKTOP_FILE="$HOME/.local/share/applications/conky-manager.desktop"
 ICON_DIR="$HOME/.local/share/icons"
-REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "Installing Conky Manager..."
+echo "=== Conky Manager Installer ==="
+echo ""
 
-# Create directories
-mkdir -p "$INSTALL_DIR"
-mkdir -p "$BIN_DIR"
-mkdir -p "$HOME/.local/share/applications"
-mkdir -p "$ICON_DIR"
-mkdir -p "$HOME/.config/conky"
-
-# Copy manager files
-cp "$REPO_DIR/conky_manager.py" "$INSTALL_DIR/conky_manager.py"
-chmod +x "$INSTALL_DIR/conky_manager.py"
-
-if [ -f "$REPO_DIR/layout_editor.py" ]; then
-    cp "$REPO_DIR/layout_editor.py" "$INSTALL_DIR/layout_editor.py"
+# Check if running as root for /opt
+if [ "$EUID" -eq 0 ]; then
+    SUDO=""
+else
+    SUDO="sudo"
 fi
 
-if [ -f "$REPO_DIR/VERSION" ]; then
-    cp "$REPO_DIR/VERSION" "$INSTALL_DIR/VERSION"
+# Install to /opt
+echo "Installing to $INSTALL_DIR..."
+$SUDO mkdir -p "$INSTALL_DIR"
+$SUDO cp -r "$REPO_DIR"/* "$INSTALL_DIR/"
+$SUDO chmod +x "$INSTALL_DIR/install.sh"
+$SUDO chmod +x "$INSTALL_DIR/uninstall.sh"
+if [ -f "$INSTALL_DIR/conky_manager.py" ]; then
+    $SUDO chmod +x "$INSTALL_DIR/conky_manager.py"
 fi
 
-# Backup existing themes before overwrite
-BACKUP_DIR="$INSTALL_DIR/backups/$(date +%Y%m%d_%H%M%S)"
+# Create local data dir
+mkdir -p "$LOCAL_DIR"
+mkdir -p "$LOCAL_DIR/backups"
+
+# Backup existing themes
+BACKUP_DIR="$LOCAL_DIR/backups/$(date +%Y%m%d_%H%M%S)"
 if ls "$HOME/.config/conky/"*-conky-manager 1>/dev/null 2>&1; then
     mkdir -p "$BACKUP_DIR"
     for theme_dir in "$HOME/.config/conky/"*-conky-manager; do
@@ -43,52 +47,42 @@ if ls "$HOME/.config/conky/"*-conky-manager 1>/dev/null 2>&1; then
     echo "Backup saved to $BACKUP_DIR"
 fi
 
-# Copy only *-conky-manager themes
-if [ -d "$REPO_DIR/themes" ]; then
-    for theme_dir in "$REPO_DIR/themes/"*-conky-manager; do
-        if [ -d "$theme_dir" ]; then
-            theme_name=$(basename "$theme_dir")
-            rm -rf "$HOME/.config/conky/$theme_name"
-            cp -r "$theme_dir" "$HOME/.config/conky/$theme_name"
-        fi
-    done
-    echo "Themes installed to ~/.config/conky/"
-fi
-
-# Copy non-conky-manager themes (calendar, revisited, etc.)
-for theme_dir in "$REPO_DIR/themes/"*/; do
-    theme_name=$(basename "$theme_dir")
-    if [ -d "$theme_dir" ] && [[ ! "$theme_name" == *"-conky-manager" ]]; then
-        # Skip if already handled or is the old system-widgets
-        if [ "$theme_name" != "system-widgets" ] && [ "$theme_name" != "conkyrc" ]; then
-            rm -rf "$HOME/.config/conky/$theme_name"
-            cp -r "$theme_dir" "$HOME/.config/conky/$theme_name"
-        fi
+# Install themes to ~/.config/conky
+mkdir -p "$HOME/.config/conky"
+for theme_dir in "$INSTALL_DIR/themes/"*-conky-manager; do
+    if [ -d "$theme_dir" ]; then
+        theme_name=$(basename "$theme_dir")
+        rm -rf "$HOME/.config/conky/$theme_name"
+        cp -r "$theme_dir" "$HOME/.config/conky/$theme_name"
     fi
 done
+echo "Themes installed to ~/.config/conky/"
 
-# Copy icon
-if [ -f "$REPO_DIR/icon.svg" ]; then
-    cp "$REPO_DIR/icon.svg" "$INSTALL_DIR/icon.svg"
-fi
-if [ -f "$REPO_DIR/icon.png" ]; then
-    cp "$REPO_DIR/icon.png" "$INSTALL_DIR/icon.png"
-fi
-
-# Create wrapper script in ~/.local/bin
+# Copy wrapper script
+mkdir -p "$BIN_DIR"
 cat > "$BIN_DIR/$SCRIPT_NAME" << 'EOF'
 #!/bin/bash
-exec python3 "$HOME/.local/share/conky-manager/conky_manager.py" "$@"
+exec python3 "/opt/conky-manager/conky_manager.py" "$@"
 EOF
 chmod +x "$BIN_DIR/$SCRIPT_NAME"
 
+# Create icon directory and copy icon
+mkdir -p "$ICON_DIR"
+if [ -f "$INSTALL_DIR/icon.png" ]; then
+    cp "$INSTALL_DIR/icon.png" "$ICON_DIR/conky-manager.png"
+fi
+if [ -f "$INSTALL_DIR/icon.svg" ]; then
+    cp "$INSTALL_DIR/icon.svg" "$ICON_DIR/conky-manager.svg"
+fi
+
 # Create .desktop file
+mkdir -p "$HOME/.local/share/applications"
 cat > "$DESKTOP_FILE" << EOF
 [Desktop Entry]
 Name=Conky Manager
 Comment=Manage and configure Conky themes
 Exec=$BIN_DIR/$SCRIPT_NAME
-Icon=$INSTALL_DIR/icon.svg
+Icon=$ICON_DIR/conky-manager.png
 Terminal=false
 Type=Application
 Categories=Utility;System;
@@ -107,7 +101,21 @@ if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
 fi
 
 echo ""
-echo "Installation complete!"
+echo "=== Installation Complete ==="
 echo ""
-echo "You can now run: $SCRIPT_NAME"
+echo "Installed to: $INSTALL_DIR"
+echo "Run with: $SCRIPT_NAME"
 echo "Or find 'Conky Manager' in your application menu"
+echo ""
+
+# Ask to delete the cloned repo
+echo ""
+read -p "Delete the cloned repo ($REPO_DIR)? (y/N): " delete_repo
+if [[ "$delete_repo" =~ ^[Yy]$ ]]; then
+    if [ "$REPO_DIR" != "$INSTALL_DIR" ]; then
+        $SUDO rm -rf "$REPO_DIR"
+        echo "Repository deleted."
+    else
+        echo "Cannot delete - repo is the install directory."
+    fi
+fi

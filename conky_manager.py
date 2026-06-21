@@ -831,8 +831,8 @@ class ConkyManagerGUI:
 
     def get_repo_path(self):
         """Find the git repo path"""
-        # Check common locations
         candidates = [
+            Path("/opt/conky-manager"),
             Path(__file__).parent,
             HOME / "Documents" / "PERSO" / "repos" / "conky",
             Path.home() / "repos" / "conky",
