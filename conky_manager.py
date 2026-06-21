@@ -28,6 +28,8 @@ except ImportError:
     print("tkinter not found. Install with: sudo apt install python3-tk")
     sys.exit(1)
 
+import layout_editor
+
 # Constants
 HOME = Path.home()
 CONKY_DIR = HOME / ".conky"
@@ -514,6 +516,7 @@ class ConkyManagerGUI:
         ttk.Button(toolbar_frame, text="Refresh", command=self.refresh_theme_list).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar_frame, text="Import Archive", command=self.import_archive).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar_frame, text="Import Folder", command=self.import_folder).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar_frame, text="Layout", command=self.open_layout_editor).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar_frame, text="Open ~/.conky", command=self.open_conky_dir).pack(side=tk.LEFT, padx=2)
 
         # Theme list
@@ -751,6 +754,10 @@ class ConkyManagerGUI:
         if self.selected_theme:
             self.manager.set_autostart(self.selected_theme, self.autostart_var.get())
             self.refresh_theme_list()
+
+    def open_layout_editor(self):
+        """Open the layout editor"""
+        layout_editor.LayoutEditor(self.root)
 
     def import_archive(self):
         """Import a theme from an archive"""
