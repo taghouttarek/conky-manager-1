@@ -303,12 +303,61 @@ class LayoutEditor:
 
     def apply_positions(self):
         self.save()
-        # Update conky lua files with new positions
         conky_config = Path.home() / ".config" / "conky"
+        updated_themes = set()
         for name, widget in self.widgets.items():
-            lua_file = conky_config / name / "settings.lua"
+            theme_dir = conky_config / name
+            updated = False
+
+            # Try settings.lua (Lua position patterns)
+            lua_file = theme_dir / "settings.lua"
             if lua_file.exists():
                 self.update_lua_position(lua_file, widget)
+                updated = True
+
+            # Try conkyrc (gap_x/gap_y/minimum_width/minimum_height patterns)
+            conkyrc = theme_dir / "conkyrc"
+            if conkyrc.exists():
+                self.update_conkyrc_position(conkyrc, widget)
+                updated = True
+
+            if updated:
+                updated_themes.add(name)
+
+        # Restart updated themes so gap_x/gap_y changes take effect
+        if updated_themes:
+            self.restart_themes(updated_themes)
+
+    def update_conkyrc_position(self, conkyrc, widget):
+        with open(conkyrc) as f:
+            content = f.read()
+
+        import re
+
+        content = re.sub(
+            r'(gap_x\s*=\s*)\d+',
+            f'\\g<1>{int(widget.x)}',
+            content
+        )
+        content = re.sub(
+            r'(gap_y\s*=\s*)\d+',
+            f'\\g<1>{int(widget.y)}',
+            content
+        )
+        content = re.sub(
+            r'(minimum_width\s*=\s*)\d+',
+            f'\\g<1>{int(widget.w)}',
+            content
+        )
+        content = re.sub(
+            r'(minimum_height\s*=\s*)\d+',
+            f'\\g<1>{int(widget.h)}',
+            content
+        )
+
+        with open(conkyrc, "w") as f:
+            f.write(content)
+        print(f"Updated {conkyrc}")
 
     def update_lua_position(self, lua_file, widget):
         with open(lua_file) as f:
@@ -319,21 +368,21 @@ class LayoutEditor:
         # Pattern 1a: local widget_x = w - N (right-aligned)
         offset_x = SCREEN_W - widget.x
         content = re.sub(
-            r'(local widget_x\s*=\s*w\s*-\s*)\d+',
+            r'(local widget_x\s*=\s*w\s*-\s*)[\d.]+',
             f'\\g<1>{offset_x}',
             content
         )
 
         # Pattern 1b: local widget_x = N (left-aligned)
         content = re.sub(
-            r'(local widget_x\s*=\s*)\d+',
+            r'(local widget_x\s*=\s*)[\d.]+',
             f'\\g<1>{int(widget.x)}',
             content
         )
 
         # Pattern 1c: local widget_y = N
         content = re.sub(
-            r'(local widget_y\s*=\s*)\d+',
+            r'(local widget_y\s*=\s*)[\d.]+',
             f'\\g<1>{int(widget.y)}',
             content
         )
@@ -348,23 +397,30 @@ class LayoutEditor:
         # Pattern 3a: local x = w - N (right-aligned system widgets)
         offset_x = SCREEN_W - widget.x
         content = re.sub(
-            r'(local x\s*=\s*w\s*-\s*)\d+',
+            r'(local x\s*=\s*w\s*-\s*)[\d.]+',
             f'\\g<1>{offset_x}',
             content
         )
 
         # Pattern 3b: local x = N (left-aligned system widgets)
         content = re.sub(
-            r'(local x\s*=\s*)\d+(?!\s*\+)',
+            r'(local x\s*=\s*)[\d.]+(?!\s*\+)',
             f'\\g<1>{int(widget.x)}',
             content
         )
 
-        # Pattern 4: local y = (h - widget_h) / 2 (system widgets - center vertically)
+        # Pattern 4a: local y = (h - widget_h) / 2 (first time)
         center_y = widget.y + widget.h // 2
         content = re.sub(
             r'(local y\s*=\s*\(h\s*-\s*widget_h\s*\)\s*/\s*2)',
             f'local y = {center_y} - widget_h / 2',
+            content
+        )
+
+        # Pattern 4b: local y = N - widget_h / 2 (already converted)
+        content = re.sub(
+            r'(local y\s*=\s*)[\d.]+\s*-\s*widget_h\s*/\s*2',
+            f'\\g<1>{center_y} - widget_h / 2',
             content
         )
 
@@ -378,7 +434,7 @@ class LayoutEditor:
         # Pattern 6: pos_x = w-N (weather - right-aligned)
         offset_x = SCREEN_W - widget.x
         content = re.sub(
-            r'(local pos_x\s*=\s*w\s*-\s*)\d+',
+            r'(local pos_x\s*=\s*w\s*-\s*)[\d.]+',
             f'\\g<1>{offset_x}',
             content
         )
@@ -386,7 +442,7 @@ class LayoutEditor:
         # Pattern 7: pos_y = N (weather)
         center_y = widget.y + widget.h // 2
         content = re.sub(
-            r'(local pos_y\s*=\s*)\d+',
+            r'(local pos_y\s*=\s*)[\d.]+',
             f'\\g<1>{center_y}',
             content
         )
@@ -394,6 +450,31 @@ class LayoutEditor:
         with open(lua_file, "w") as f:
             f.write(content)
         print(f"Updated {lua_file}")
+
+    def restart_themes(self, theme_names):
+        for name in theme_names:
+            conky_config = Path.home() / ".config" / "conky"
+            conkyrc = conky_config / name / "conkyrc"
+            if not conkyrc.exists():
+                continue
+            # Kill existing conky process for this theme
+            try:
+                subprocess.run(
+                    ['pkill', '-f', f'conky.*-c.*{name}'],
+                    timeout=5
+                )
+            except Exception:
+                pass
+            # Restart conky
+            try:
+                subprocess.Popen(
+                    ['conky', '-c', str(conkyrc), '-d', '-m', '0'],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
+                print(f"Restarted {name}")
+            except Exception as e:
+                print(f"Failed to restart {name}: {e}")
 
 
 if __name__ == "__main__":

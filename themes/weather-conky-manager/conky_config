@@ -20,7 +20,7 @@ conky.config = {
 	border_inner_margin = 0,
 	border_outer_margin = 0,
 
-	minimum_width = 1920, minimum_height = 1200,
+	minimum_width = 1920, minimum_height = 1080,
 
 
 	alignment = 'top_left',

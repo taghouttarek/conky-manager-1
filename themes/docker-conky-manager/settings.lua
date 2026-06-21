@@ -39,7 +39,7 @@ function draw_icon_docker(cr, x, y, size)
     cairo_move_to(cr, x - size * 0.4, y + size * 0.45)
     for i = 0, 8 do
         local wx = x - size * 0.4 + i * size * 0.1
-        local wy = y + size * 0.45 + ((i % 2 == 0) and 0 or size * 0.05)
+        local wy = y + size * 0.45 + ((i % 2 == 0) and 0 or size * 05)
         cairo_line_to(cr, wx, wy)
     end
     cairo_stroke(cr)
