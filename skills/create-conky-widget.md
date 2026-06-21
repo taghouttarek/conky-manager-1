@@ -5,11 +5,27 @@ description: Create conky widgets matching the system-widgets theme style - whit
 
 # create-conky-widget
 
-Create conky widgets matching the system-widgets theme style for the conky-manager repo.
+Create conky widgets for the conky-manager repo following the unified positioning system.
+
+## Naming Convention
+
+Theme directory MUST use the `-conky-manager` suffix:
+```
+themes/<widget-name>-conky-manager/
+```
+
+## File Structure
+
+```
+themes/<widget-name>-conky-manager/
+├── conkyrc              # Config (loads positions.lua + settings.lua)
+├── settings.lua         # Lua drawing code + theme settings
+├── PNG/                 # Image assets (optional)
+```
 
 ## Style Reference
 
-Based on `themes/system-widgets/widgets.lua`:
+Based on the system widgets (network, bandwidth, processes, docker, k8s):
 
 ### Colors & Transparency
 ```lua
@@ -94,82 +110,188 @@ function draw_icon_<name>(cr, x, y, size)
     cairo_set_source_rgba(cr, r, g, b, transparency_value)
     cairo_set_line_width(cr, 1.5)
     -- Draw icon shape here (arcs, lines, filled shapes, etc.)
-    -- For filled shapes: use cairo_fill(cr)
-    -- For outlines: use cairo_stroke(cr)
 end
 ```
 
-**IMPORTANT**: Icons MUST use `operator_transpose[mode]` (not `operator[mode]`) to appear dark on the semi-transparent background. Using `operator[mode]` draws white which is invisible.
+**IMPORTANT**: Icons MUST use `operator_transpose[mode]` (not `operator[mode]`) to appear dark on the semi-transparent background.
 
-## Widget Sizes
-- Width: 220-250px
-- Height: varies (120-220px depending on content)
-- Title at y+20, content starts at y+45
+## Widget Sizes (must register in MIN_WIDGET_SIZES)
 
-## Layout in conkyrc
-```lua
-conky.config = {
-    minimum_width = 1920, minimum_height = 1080,
-    alignment = 'top_left',
-    gap_x = 0, gap_y = 50,
-    -- ... standard settings
-    lua_load = '~/.config/conky/<theme>/widgets.lua',
-    lua_draw_hook_pre = 'start_widgets',
+Every widget must define its content dimensions (`local w, h = ...`) and register the minimum size in `layout_editor.py`:
+```python
+MIN_WIDGET_SIZES = {
+    # ... existing entries ...
+    "<widget-name>-conky-manager": (<min_width>, <min_height>),
 }
 ```
 
-## Positioning (in draw_function)
+Typical sizes: Width 220-250px, Height 120-250px depending on content.
+
+Also add default position to `default_widgets` in `load_widgets()`:
+```python
+"<widget-name>-conky-manager": {"x": <x>, "y": <y>, "w": <w>, "h": <h>, "color": "<hex>"},
+```
+
+## conkyrc Template (CRITICAL - follow exactly)
+
+```lua
+conky.config = {
+    background = false,
+    update_interval = 2,
+    override_utf8_locale = true,
+    double_buffer = true,
+    no_buffers = true,
+    text_buffer_size = 2048,
+    imlib_cache_size = 0,
+    own_window = true,
+    own_window_transparent = true,
+    own_window_argb_visual = true,
+    own_window_type = 'normal',
+    own_window_hints = 'undecorated,below,sticky,skip_taskbar,skip_pager',
+    border_inner_margin = 0,
+    border_outer_margin = 0,
+    minimum_width = 1920, minimum_height = 1200,
+    alignment = 'top_left',
+    gap_x = 0,
+    gap_y = 0,
+    draw_shades = false,
+    draw_outline = false,
+    draw_borders = false,
+    draw_graph_borders = false,
+    font = 'Dejavu Sans:size=10',
+    xftalpha = 0.8,
+    uppercase = false,
+    default_color = 'FFFFFF',
+    lua_load = '~/.config/conky/positions.lua ~/.config/conky/<widget-name>-conky-manager/settings.lua',
+    lua_draw_hook_pre = 'start_widgets',
+}
+conky.text = [[
+]]
+```
+
+**Key points:**
+- `gap_x = 0`, `gap_y = 0` always — positioning done in Lua via `positions.lua`
+- `minimum_width = 1920`, `minimum_height = 1200` — fullscreen window
+- `lua_load` loads `positions.lua` FIRST, then `settings.lua`
+
+## Positioning (CRITICAL - read from positions.lua)
+
+Positions are NOT hardcoded. They are read from the shared `~/.config/conky/positions.lua` at runtime:
+
 ```lua
 function draw_function(cr)
     local w, h = conky_window.width, conky_window.height
     cairo_select_font_face(cr, "Dejavu Sans Book", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_NORMAL)
 
-    -- Left side widgets
-    local left_x = 30
-    local left_y = 720  -- below existing widgets
-    draw_<widget>(cr, left_x, left_y)
+    local x = positions["<widget-name>-conky-manager"].x
+    local y = positions["<widget-name>-conky-manager"].y
 
-    -- Right side widgets
-    local right_x = w - 280
-    local right_y = 720
-    draw_<widget>(cr, right_x, right_y)
+    draw_<widget>(cr, x, y)
 end
 ```
 
-## Entry Point
+The `positions` table is loaded by `positions.lua` which is loaded first in `lua_load`. It contains:
 ```lua
+positions = {
+    ["<widget-name>-conky-manager"] = {x = N, y = N},
+    ...
+}
+```
+
+## settings.lua Template (CRITICAL - follow exactly)
+
+```lua
+-- ###<Widget> settings###
+-- (your theme-specific settings here)
+-- ###Style (matching system-widgets)###
+HTML_color = "#FFFFFF"
+HTML_color_border = "#FFFFFF"
+transparency_bg = 0.6
+transparency_border = 0.1
+transparency_text = 0.6
+transparency_value = 0.9
+-- ###Mode###
+mode = 1
+border_size = 4
+-- ###Dont change code below###
+require 'cairo'
+assert(os.setlocale("en_US.utf8", "numeric"))
+
+-- hex2rgb, draw_square, draw_text, draw_icon, etc.
+
+function draw_function(cr)
+    local w, h = conky_window.width, conky_window.height
+
+    local x = positions["<widget-name>-conky-manager"].x
+    local y = positions["<widget-name>-conky-manager"].y
+
+    draw_<widget>(cr, x, y)
+end
+
 function conky_start_widgets()
+    local function draw_conky_function(cr)
+        draw_function(cr)
+    end
+
     if conky_window == nil then return end
     local cs = cairo_xlib_surface_create(conky_window.display, conky_window.drawable,
         conky_window.visual, conky_window.width, conky_window.height)
     local cr = cairo_create(cs)
 
     local updates = conky_parse('${updates}')
-    if tonumber(updates) > 5 then
-        draw_function(cr)
+    if tonumber(updates or "0") > 5 then
+        draw_conky_function(cr)
     end
     cairo_surface_destroy(cs)
     cairo_destroy(cr)
 end
 ```
 
+**Key requirements:**
+- `require 'cairo'` — needed for all cairo drawing
+- `os.setlocale("en_US.utf8", "numeric")` — required for numeric formatting
+- `tonumber(updates or "0") > 5` — wait for conky to initialize before drawing
+- `positions["<theme>"].x/.y` — read position from shared positions.lua
+- `cairo_surface_destroy(cs)` before `cairo_destroy(cr)` — standard cleanup order
+
 ## Data Fetching
 Use `conky_parse("${exec ...}")` for external data:
 ```lua
 local val = conky_parse("${exec python3 /path/to/script --flag 2>/dev/null}")
 ```
+Use `tonumber()` when parsing for arithmetic:
+```lua
+local num = tonumber(conky_parse('${exec ...}')) or 0
+```
 
 ## Existing Widgets (for reference)
-- `themes/system-widgets/widgets.lua` - network, bandwidth, processes, docker, k8s
-- `themes/crypto-tracker/settings.lua` - crypto price with chart
+- `themes/network-conky-manager/` — network info
+- `themes/bandwidth-conky-manager/` — download/upload speed
+- `themes/processes-conky-manager/` — top processes by CPU
+- `themes/docker-conky-manager/` — Docker containers
+- `themes/k8s-conky-manager/` — Kubernetes context
+- `themes/crypto-conky-manager/` — crypto prices with chart
+- `themes/kev-conky-manager/` — CISA KEV feed
+- `themes/infra-conky-manager/` — infrastructure CVEs
+- `themes/weather-conky-manager/` — weather (circle style)
+- `themes/calendar-conky-manager/` — calendar with rings
+- `themes/revisited-conky-manager/` — desktop widgets
+- `themes/claude-conky-manager/` — Claude ring widgets
 
 ## Steps to Create a New Widget
 
-1. Create `themes/<name>/` directory
-2. Create `widgets.lua` following the style above
-3. Create `conkyrc` with full-screen canvas (1920x1080)
-4. Create `conkyrc` symlink: `ln -sf conkyrc_actual conkyrc`
-5. Position widget in `draw_function()` to not overlap existing widgets
-6. Test: `conky -c ~/.config/conky/<name>/conkyrc`
-7. Copy to system: `cp -r themes/<name> ~/.config/conky/`
-8. Commit to repo
+1. Create `themes/<name>-conky-manager/` directory
+2. Create `settings.lua` following the template above
+3. Create `conkyrc` following the template above (load positions.lua first!)
+4. Run `luac -p settings.lua` to validate Lua syntax
+5. Test: `conky -c ~/.config/conky/<name>-conky-manager/conkyrc`
+6. Add entry to `MIN_WIDGET_SIZES` in `layout_editor.py`:
+   ```python
+   "<name>-conky-manager": (<min_width>, <min_height>),
+   ```
+7. Add entry to `default_widgets` in `layout_editor.py` `load_widgets()`:
+   ```python
+   "<name>-conky-manager": {"x": <x>, "y": <y>, "w": <w>, "h": <h>, "color": "<hex>"},
+   ```
+8. Copy to system: `cp -r themes/<name>-conky-manager ~/.config/conky/`
+9. Commit to repo

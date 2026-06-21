@@ -5,7 +5,7 @@ This is a Conky theme manager repository containing:
 - `conky_manager.py` - Main manager application (Python/Tkinter)
 - `layout_editor.py` - Drag-and-drop layout editor for widget positioning
 - `themes/` - All conky themes
-- `tests/` - Non-regression test suite (70 tests)
+- `tests/` - Non-regression test suite (76 tests)
 - `install.sh` / `uninstall.sh` - Installation scripts
 
 ## Key Rules
@@ -29,21 +29,28 @@ Any fix, modification, or new theme applied to the system MUST be committed back
 ## Architecture
 
 ### conky_manager.py
-- Scans `~/.conky/` and `~/.config/conky/` for themes
-- Detects themes by config files: `.conkyrc`, `conkyrc`, `*.conf`, `config.conf`, `conky.conf`
+- Scans `~/.config/conky/` for themes
+- Detects themes by config files: `conkyrc`, `*.conf`, `config.conf`, `conky.conf`
 - If theme uses non-standard config name, create a `conkyrc` symlink in theme root
 - Supports running multiple themes simultaneously
-- Each theme runs as separate conky process
+- Each theme runs as separate conky process with `-m <monitor>` flag
 
 ### Theme Structure
 ```
 themes/<theme-name>/
-├── conkyrc              # Symlink or actual config (required for manager detection)
-├── settings.lua         # Lua settings (if theme uses lua)
-├── *.lua                # Lua scripts
+├── conkyrc              # Config (loads positions.lua + settings.lua)
+├── settings.lua         # Lua settings and drawing code
+├── *.lua                # Additional Lua scripts
 ├── PNG/                 # Image assets (if any)
-└── start_conky          # Actual config file (conky 1.19 syntax)
 ```
+
+### Shared Positioning System
+- `~/.config/conky/positions.lua` — shared position config for all themes
+- `~/.config/conky/layout.json` — layout state (resolution, monitor, widget positions)
+- All themes load `positions.lua` first via `lua_load`, then their own `settings.lua`
+- Themes read `positions["<theme-name>"].x/.y` at runtime
+- Layout editor writes both `layout.json` and `positions.lua`
+- Each conkyrc must load: `lua_load = '~/.config/conky/positions.lua ~/.config/conky/<theme>/settings.lua'`
 
 ### Layout Editor (`layout_editor.py`)
 - Scans running conky processes via `pgrep -a conky`
@@ -51,14 +58,30 @@ themes/<theme-name>/
 - Canvas uses `scale` factor (0.5 default) for display
 - Drag converts canvas deltas: `dx = canvas_delta / scale`
 - Position clamped to `[0, screen_w - w]` x `[0, screen_h - h]`
-- Resolution configurable via presets (1920x1080, 2560x1440, 3840x2160, Custom) or manual W/H entry fields
-- Changing resolution proportionally rescales all widget positions
-- `layout.json` stores `"resolution": {"w": N, "h": N}` alongside widget positions
-- `update_conkyrc_position` writes `gap_x`, `gap_y`, `minimum_width`, `minimum_height`
-- `update_lua_position` writes `local widget_x`, `local widget_y`, `local x`, `local y`
-- Symlinks resolved before read/write
-- Files only written when content actually changed
-- Auto-restart themes after applying positions
+
+**Features:**
+- **Fullscreen on open** — `attributes('-zoomed', True)` with fallback
+- **Resolution presets** — 1920x1080, 2560x1440, 3840x2160, Custom
+- **Monitor selection** — dropdown with `xrandr --listmonitors` detection
+- **Center All** button — centers bounding box of all widgets on screen
+- **H/V center buttons** — per-widget horizontal/vertical centering (canvas tag_bind)
+- **Multi-select** — Ctrl+Click to select multiple widgets, drag moves all together
+- **Alignment guides** — red dashed lines appear when dragging near alignment points
+- **Magnetic snapping** — snaps to other widget edges/centers, screen edges, screen center (2px threshold)
+- **Equal spacing snap** — snaps when gap matches existing gap between other widgets
+- **Per-widget minimum sizes** — `MIN_WIDGET_SIZES` dict enforces content-based min sizes
+- **Auto-restart themes** after applying positions
+
+**Key methods:**
+- `save_positions()` — writes `layout.json` AND `positions.lua`
+- `update_conkyrc_position()` — updates `gap_x/gap_y` to 0, `minimum_width/height`
+- `restart_themes()` — kills and restarts themes with `-m <monitor>` flag
+- `detect_monitors()` — parses `xrandr --listmonitors`
+- `_compute_snap()` — core snapping algorithm with guide line generation
+
+**Data flow:**
+- `layout.json`: `{"resolution": {"w": N, "h": N}, "monitor": 0, "<theme>": {"x": N, "y": N, "w": N, "h": N}}`
+- `positions.lua`: `screen = {w = N, h = N, monitor = 0}` + `positions = {["<theme>"] = {x = N, y = N}}`
 
 ## Conky 1.19 Compatibility
 
@@ -70,13 +93,13 @@ conky.config = {
     own_window = true,
     own_window_type = 'normal',
     font = 'Dejavu Sans:size=10',
-    minimum_width = 300,
-    minimum_height = 200,
-    -- NO: xftfont, minimum_size (old syntax)
+    minimum_width = 1920, minimum_height = 1200,
+    alignment = 'top_left',
+    gap_x = 0, gap_y = 0,
+    lua_load = '~/.config/conky/positions.lua ~/.config/conky/<theme>/settings.lua',
+    lua_draw_hook_pre = 'start_widgets',
 }
-
 conky.text = [[
-${cpu}%
 ]]
 ```
 
@@ -88,6 +111,8 @@ ${cpu}%
 ### Lua Requirements
 - Use `tonumber()` when parsing conky exec output for arithmetic
 - Example: `local val = tonumber(conky_parse('${exec command}')) or 0`
+- Always include `updates > 5` guard in `conky_start_widgets`
+- Always include `os.setlocale("en_US.utf8", "numeric")` in settings.lua
 
 ## Fix History
 
@@ -99,62 +124,65 @@ ${cpu}%
 ### Path Corrections
 - All themes moved from `~/.conky/` to `~/.config/conky/`
 - Updated `lua_load` paths in all configs
-- Updated `openweather.py` paths in weather settings.lua
-- Updated `draw_weather_icon` PNG path in settings.lua
-
-### Conky-Calendar-Extra Fixes
-- Converted from old conky syntax to 1.19 Lua format
-- Fixed `xftfont` → `font`
-- Fixed `minimum_size` → `minimum_width/height`
-- Added `tonumber()` for elements parameter in `create_circle()`
-- Added nil check for temperature values in `vertical_bars()`
-
-### Conky-Weather Fixes
-- Updated API key, city, country in settings.lua
-- Fixed PNG path from `~/.conky/` to `~/.config/conky/`
 
 ### Unified Widget Positioning (v2.0.4)
-- All themes use fullscreen windows (1920x1080) with `gap_x = 0`, `gap_y = 0`
-- Content positioned with absolute screen coordinates in Lua (`local x = N`, `local y = N`)
-- Removed window-relative positioning (`w - N`, `(h - widget_h) / 2`)
-- Layout editor updates both conkyrc (`gap_x`/`gap_y`) and settings.lua (`x`/`y`)
-- Layout editor resolves symlinks before writing
-- Layout editor scans all `.lua` files in theme dir for position variables
+- All themes use fullscreen windows (1920x1200) with `gap_x = 0`, `gap_y = 0`
+- Content positioned with absolute screen coordinates in Lua
+- Shared `positions.lua` loaded by all themes via `lua_load`
+- Layout editor writes `positions.lua` (not individual Lua files)
 - Auto-restart themes after applying positions
 
 ### Code Review Fixes (v2.0.4)
-- Fixed `hex2rgb()` blue channel bug across all 9 themes (was dividing string by 255)
+- Fixed `hex2rgb()` blue channel bug across all 9 themes
 - Added `os.setlocale("en_US.utf8", "numeric")` to 5 missing files
-- Fixed `update_num` nil dereference in 7 files (crashes on first conky update)
-- Fixed weather theme: `io.popen` leak → `os.getenv("HOME")`, nil concatenation guards
-- Fixed weather theme: global variables (`ct`, `day`) → local, memory leak in `cairo_text_extents_t`
+- Fixed `update_num` nil dereference in 7 files
+- Fixed weather theme: `io.popen` leak, nil concatenation guards, global vars→local
 - Fixed docker theme: `size * 05` typo → `size * 0.05`
-- Layout editor: error handling per-theme, PID validation, file write guard (only writes when changed)
-- Layout editor: atomic file writes, UTF-8 encoding, corrupted JSON handling
-- Removed hardcoded developer path from `get_repo_path()`
+- Layout editor: atomic file writes, error handling, PID validation
+
+### Weather Widget Fix (v2.0.5)
+- Added `updates > 5` guard to `conky_start_widgets` (was the only theme missing it)
+- Added `pcall` error handling with logging to `error.log`
+- Reduced `update_interval` from 15 to 3 for faster restart visibility
+
+### Layout Editor Features (v2.0.6)
+- Fullscreen on open (attributes('-zoomed', True))
+- Monitor detection and selection via `xrandr --listmonitors`
+- `-m <monitor>` flag for conky start/restart
+- Center All button for centering all widgets on screen
+- H/V center buttons per widget (canvas tag_bind)
+- Multi-select with Ctrl+Click
+- Alignment guides (red dashed lines)
+- Magnetic snapping (2px threshold) to edges, centers, screen
+- Equal spacing snap between widget pairs
+- Per-widget minimum sizes via `MIN_WIDGET_SIZES`
+- Configurable resolution with presets and manual entry
 
 ## Adding New Themes
 
-1. Place theme in `themes/<theme-name>/`
-2. Create `conkyrc` symlink pointing to actual config:
-   ```bash
-   cd themes/<theme-name>
-   ln -sf actual_config_file conkyrc
+1. Create `themes/<name>-conky-manager/` directory (MUST use `-conky-manager` suffix)
+2. Create `settings.lua` with `require 'cairo'`, `os.setlocale`, `positions["<theme>"].x/.y`
+3. Create `conkyrc` that loads `positions.lua` FIRST:
+   ```lua
+   lua_load = '~/.config/conky/positions.lua ~/.config/conky/<theme>-conky-manager/settings.lua',
    ```
-3. If theme uses Lua, ensure paths are absolute or use `~/.config/conky/`
-4. Convert old conky syntax to 1.19 Lua format if needed
-5. Test with: `conky -c themes/<theme-name>/<config-file>`
-6. Commit to repo
+4. Include `updates > 5` guard in `conky_start_widgets`
+5. Run `luac -p settings.lua` to validate syntax
+6. Add to `MIN_WIDGET_SIZES` in `layout_editor.py`
+7. Add to `default_widgets` in `layout_editor.py` `load_widgets()`
+8. Test: `conky -c ~/.config/conky/<theme>-conky-manager/conkyrc`
+9. Copy to system: `cp -r themes/<theme>-conky-manager ~/.config/conky/`
+10. Commit to repo
 
 ## Running Conky Manually
 
 ```bash
 # Start single theme
-conky -c ~/.config/conky/<theme-name>/<config-file>
+conky -c ~/.config/conky/<theme-name>/conkyrc -d -m 0
 
 # Start multiple themes
-conky -c ~/.config/conky/theme1/config &
-conky -c ~/.config/conky/theme2/config &
+conky -c ~/.config/conky/theme1/conkyrc -d -m 0 &
+conky -c ~/.config/conky/theme2/conkyrc -d -m 0 &
 
 # Stop all
 killall conky
@@ -175,7 +203,7 @@ ps aux | grep conky | grep -v grep
 ## Running Tests
 
 ```bash
-# Run all tests (70 tests)
+# Run all tests (76 tests)
 pytest tests/ -v
 
 # Run with coverage

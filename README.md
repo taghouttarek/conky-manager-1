@@ -13,7 +13,7 @@ A full-featured Python/Tkinter GUI for managing Conky themes on Linux.
 - **Archive Import** - Import themes from zip, tar, tar.gz, tar.xz, 7z
 - **Folder Import** - Import themes directly from local folders
 - **Autostart** - Configure themes to start on login via `.desktop` entries
-- **Layout Editor** - Drag-and-drop interface for positioning widgets with zoom controls
+- **Layout Editor** - Drag-and-drop interface for positioning widgets with zoom, alignment guides, and magnetic snapping
 - **Auto-Update** - Check for updates from git repo, backup and apply automatically
 - **Theme Editing** - Edit theme configs directly from the manager
 - **Theme Deletion** - Remove unused themes (multi-select supported)
@@ -137,10 +137,19 @@ python3 /opt/conky-manager/conky_manager.py
 The layout editor provides a visual interface for positioning widgets:
 
 - **Move Mode** - Drag widgets to reposition
-- **Resize Mode** - Drag corners to resize
+- **Resize Mode** - Drag corners to resize (per-widget minimum sizes enforced)
 - **Zoom +/-** - Zoom in/out for precision
-- **Save** - Save positions to layout.json
-- **Apply** - Update gap_x/gap_y in conkyrc AND x/y in settings.lua, then restart themes
+- **Save** - Save positions to layout.json and positions.lua
+- **Apply** - Update positions, restart affected themes
+- **Center All** - Center all widgets on screen
+- **H/V Buttons** - Per-widget horizontal/vertical center buttons (top-right corner)
+- **Multi-Select** - Ctrl+Click to select multiple widgets, drag moves all together
+- **Alignment Guides** - Red dashed lines appear when dragging near alignment points
+- **Magnetic Snapping** - Snaps to widget edges/centers, screen edges, and screen center (2px threshold)
+- **Equal Spacing Snap** - Snaps when gap matches existing gap between other widgets
+- **Monitor Selection** - Detect monitors via xrandr, launch conky on selected monitor
+- **Resolution Presets** - 1920x1080, 2560x1440, 3840x2160, or custom W/H
+- **Fullscreen on Open** - Opens maximized by default
 
 ### Auto-Update
 
@@ -179,16 +188,18 @@ ${cpu}%
 
 All themes use the same positioning model:
 
-1. **Fullscreen window** (1920x1080) with `alignment = 'top_left'`, `gap_x = 0`, `gap_y = 0`
-2. **Absolute screen coordinates** in Lua (`local x = N`, `local y = N`)
-3. **Layout editor** updates both `gap_x`/`gap_y` in conkyrc and `x`/`y` in settings.lua
-4. **Auto-restart** after applying positions so changes take effect
+1. **Fullscreen window** (1920x1200) with `alignment = 'top_left'`, `gap_x = 0`, `gap_y = 0`
+2. **Shared positions.lua** (`~/.config/conky/positions.lua`) loaded by all themes via `lua_load`
+3. **Themes read positions at runtime**: `positions["<theme-name>"].x/.y`
+4. **Layout editor** writes both `layout.json` and `positions.lua`
+5. **Auto-restart** after applying positions so changes take effect
+6. **Monitor support** via `-m <monitor>` flag, stored in layout.json
 
 This ensures the same logic works for all themes (system widgets, calendar, weather, revisited, etc.).
 
 ## Testing
 
-Non-regression test suite with 70 tests covering theme structure, Lua syntax, business logic, and layout editor.
+Non-regression test suite with 76 tests covering theme structure, Lua syntax, business logic, and layout editor.
 
 ```bash
 # Install test dependencies
@@ -223,6 +234,8 @@ sudo dpkg -r conky-manager
 |------|-------------|
 | `/opt/conky-manager/` | Installation directory |
 | `~/.config/conky/` | Theme configurations |
+| `~/.config/conky/positions.lua` | Shared widget positions for all themes |
+| `~/.config/conky/layout.json` | Layout state (resolution, monitor, positions) |
 | `~/.local/share/conky-manager/` | Manager data and backups |
 | `~/.local/bin/conky-manager` | Launcher script |
 | `~/.local/share/applications/conky-manager.desktop` | Desktop entry |
