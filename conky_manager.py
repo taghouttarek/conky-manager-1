@@ -191,6 +191,18 @@ class ConkyManager:
             'has_images': any(parent_dir.glob('*.png')) or any(parent_dir.glob('*.jpg')),
         }
 
+    def get_monitor_index(self):
+        """Get current monitor index from layout.json."""
+        try:
+            layout_file = Path.home() / ".config" / "conky" / "layout.json"
+            if layout_file.exists():
+                with open(layout_file) as f:
+                    data = json.load(f)
+                return data.get("monitor", 0)
+        except Exception:
+            pass
+        return 0
+
     def start_conky(self, theme):
         """Start conky with a specific theme"""
         config_path = theme['config']
@@ -204,14 +216,15 @@ class ConkyManager:
             return True
 
         try:
-            cmd = ['conky', '-c', config_path, '-d', '-m', '0']
+            monitor = self.get_monitor_index()
+            cmd = ['conky', '-c', config_path, '-d', '-m', str(monitor)]
             subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if 'running_themes' not in self.settings:
                 self.settings['running_themes'] = []
             if theme['name'] not in self.settings['running_themes']:
                 self.settings['running_themes'].append(theme['name'])
             self.save_settings()
-            self.log(f"Started conky with theme: {theme['name']}")
+            self.log(f"Started conky with theme: {theme['name']} on monitor {monitor}")
             return True
         except Exception as e:
             self.log(f"Error starting conky: {e}")
@@ -398,10 +411,11 @@ class ConkyManager:
         autostart_file = AUTOSTART_DIR / f"conky-{theme['name']}.desktop"
 
         if enabled:
+            monitor = self.get_monitor_index()
             content = f"""[Desktop Entry]
 Type=Application
 Name=Conky {theme['name']}
-Exec=/usr/bin/conky -c {theme['config']} -m 0
+Exec=/usr/bin/conky -c {theme['config']} -m {monitor}
 Hidden=false
 NoDisplay=false
 X-GNOME-Autostart-enabled=true
@@ -409,7 +423,7 @@ X-GNOME-Autostart-enabled=true
             try:
                 with open(autostart_file, 'w') as f:
                     f.write(content)
-                self.log(f"Autostart enabled for: {theme['name']}")
+                self.log(f"Autostart enabled for: {theme['name']} on monitor {monitor}")
                 return True
             except Exception as e:
                 self.log(f"Error setting autostart: {e}")
@@ -525,6 +539,18 @@ class ConkyManagerGUI:
         ttk.Button(toolbar_frame, text="Open ~/.conky", command=self.open_conky_dir).pack(side=tk.LEFT, padx=2)
 
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+
+        # Monitor selector
+        ttk.Label(toolbar_frame, text="Monitor:").pack(side=tk.LEFT, padx=(5, 2))
+        self.monitor_var = tk.StringVar()
+        self.monitor_combo = ttk.Combobox(
+            toolbar_frame, textvariable=self.monitor_var,
+            values=[], width=20, state="readonly"
+        )
+        self.monitor_combo.pack(side=tk.LEFT, padx=2)
+        self.monitor_combo.bind("<<ComboboxSelected>>", self._on_monitor_change)
+        self._populate_monitors()
+
         self.update_btn = ttk.Button(toolbar_frame, text="Update", command=self.update_from_repo)
         self.update_btn.pack(side=tk.RIGHT, padx=2)
         ttk.Button(toolbar_frame, text="Restart Manager", command=self.restart_manager).pack(side=tk.RIGHT, padx=2)
@@ -780,6 +806,59 @@ class ConkyManagerGUI:
         for theme in self.get_selected_themes():
             self.manager.set_autostart(theme, enabled)
         self.refresh_theme_list()
+
+    def _populate_monitors(self):
+        """Detect monitors and populate the dropdown."""
+        self.monitors = []
+        try:
+            result = subprocess.run(
+                ['xrandr', '--listmonitors'], capture_output=True, text=True, timeout=5
+            )
+            for line in result.stdout.splitlines():
+                parts = line.strip().split()
+                if parts and parts[0].rstrip(':').isdigit():
+                    idx = int(parts[0].rstrip(':'))
+                    name = parts[-1]
+                    geom = parts[2]
+                    w_str, h_str = geom.split('/')[0].split('x')
+                    h_str = h_str.split('/')[0]
+                    w, h = int(w_str), int(h_str)
+                    label = f"{name} ({w}x{h})"
+                    self.monitors.append({"index": idx, "label": label})
+        except Exception:
+            pass
+        if not self.monitors:
+            self.monitors = [{"index": 0, "label": "default (1920x1080)"}]
+
+        labels = [m["label"] for m in self.monitors]
+        self.monitor_combo["values"] = labels
+
+        # Select current monitor from layout.json
+        current = self.manager.get_monitor_index()
+        for i, m in enumerate(self.monitors):
+            if m["index"] == current:
+                self.monitor_combo.current(i)
+                return
+        self.monitor_combo.current(0)
+
+    def _on_monitor_change(self, event=None):
+        """Handle monitor selection change."""
+        idx = self.monitor_combo.current()
+        if 0 <= idx < len(self.monitors):
+            monitor = self.monitors[idx]["index"]
+            # Save to layout.json
+            layout_file = Path.home() / ".config" / "conky" / "layout.json"
+            try:
+                data = {}
+                if layout_file.exists():
+                    with open(layout_file) as f:
+                        data = json.load(f)
+                data["monitor"] = monitor
+                with open(layout_file, 'w') as f:
+                    json.dump(data, f, indent=2)
+                self.log(f"Monitor set to {self.monitors[idx]['label']}")
+            except Exception as e:
+                self.log(f"Error saving monitor: {e}")
 
     def open_layout_editor(self):
         """Open the layout editor"""

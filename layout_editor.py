@@ -22,6 +22,30 @@ MAX_SCREEN_W = 7680
 MAX_SCREEN_H = 4320
 
 
+def detect_monitors():
+    """Detect connected monitors via xrandr. Returns list of dicts."""
+    monitors = []
+    try:
+        result = subprocess.run(
+            ['xrandr', '--listmonitors'], capture_output=True, text=True, timeout=5
+        )
+        for line in result.stdout.splitlines():
+            parts = line.strip().split()
+            if parts and parts[0].rstrip(':').isdigit():
+                idx = int(parts[0].rstrip(':'))
+                name = parts[-1]
+                geom = parts[2]
+                w_str = geom.split('x')[0].split('/')[0]
+                h_str = geom.split('x')[1].split('/')[0]
+                w, h = int(w_str), int(h_str)
+                monitors.append({"index": idx, "name": name, "w": w, "h": h})
+    except Exception:
+        pass
+    if not monitors:
+        monitors.append({"index": 0, "name": "default", "w": DEFAULT_SCREEN_W, "h": DEFAULT_SCREEN_H})
+    return monitors
+
+
 def load_layout():
     if LAYOUT_FILE.exists():
         try:
@@ -40,13 +64,13 @@ def save_layout(data):
     os.replace(tmp, LAYOUT_FILE)
 
 
-def save_positions(screen_w, screen_h, widgets):
+def save_positions(screen_w, screen_h, monitor, widgets):
     """Write shared positions.lua for all themes."""
     POSITIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
     lines = [
         "-- Shared widget positions and screen config",
         "-- Managed by Conky Layout Editor - do not edit manually",
-        f"screen = {{w = {int(screen_w)}, h = {int(screen_h)}}}",
+        f"screen = {{w = {int(screen_w)}, h = {int(screen_h)}, monitor = {int(monitor)}}}",
         "positions = {",
     ]
     for name, widget in sorted(widgets.items()):
@@ -138,15 +162,13 @@ class LayoutEditor:
         self.screen_w = DEFAULT_SCREEN_W
         self.screen_h = DEFAULT_SCREEN_H
         self.scale = DEFAULT_SCALE
+        self.monitor = 0
 
-        try:
-            sw = self.root.winfo_screenwidth()
-            sh = self.root.winfo_screenheight()
-            if sw > 0 and sh > 0:
-                self.screen_w = sw
-                self.screen_h = sh
-        except Exception:
-            pass
+        self.monitors = detect_monitors()
+        if self.monitors:
+            self.screen_w = self.monitors[0]["w"]
+            self.screen_h = self.monitors[0]["h"]
+            self.monitor = self.monitors[0]["index"]
 
         self.root.title("Conky Layout Editor")
         self._update_geometry()
@@ -166,6 +188,9 @@ class LayoutEditor:
         w = int(self.screen_w * self.scale) + 60
         h = int(self.screen_h * self.scale) + 120
         self.root.geometry(f"{w}x{h}")
+
+    def _monitor_label(self, m):
+        return f"{m['name']} ({m['w']}x{m['h']})"
 
     def setup_ui(self):
         # Toolbar
@@ -188,6 +213,22 @@ class LayoutEditor:
         ttk.Radiobutton(toolbar, text="Resize", variable=self.mode_var, value="resize").pack(side=tk.LEFT, padx=2)
 
         ttk.Separator(toolbar, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
+
+        # Detect button
+        ttk.Button(toolbar, text="Detect", command=self._on_detect).pack(side=tk.LEFT, padx=2)
+
+        # Monitor dropdown
+        self.monitor_var = tk.StringVar()
+        self.monitor_labels = [self._monitor_label(m) for m in self.monitors]
+        self.monitor_combo = ttk.Combobox(
+            toolbar, textvariable=self.monitor_var,
+            values=self.monitor_labels, width=25, state="readonly"
+        )
+        self.monitor_combo.pack(side=tk.LEFT, padx=2)
+        self.monitor_combo.bind("<<ComboboxSelected>>", self._on_monitor_change)
+        # Set initial selection
+        if self.monitor_labels:
+            self.monitor_combo.current(0)
 
         # Resolution preset dropdown
         self.resolution_var = tk.StringVar(value=self._current_preset())
@@ -249,6 +290,31 @@ class LayoutEditor:
             return key
         return "Custom"
 
+    def _on_detect(self):
+        """Re-detect monitors and refresh dropdown."""
+        self.monitors = detect_monitors()
+        self.monitor_labels = [self._monitor_label(m) for m in self.monitors]
+        self.monitor_combo["values"] = self.monitor_labels
+        if self.monitor_labels:
+            self.monitor_combo.current(0)
+            self._apply_monitor(0)
+
+    def _on_monitor_change(self, event=None):
+        idx = self.monitor_combo.current()
+        if 0 <= idx < len(self.monitors):
+            self._apply_monitor(idx)
+
+    def _apply_monitor(self, idx):
+        m = self.monitors[idx]
+        self.monitor = m["index"]
+        self.screen_w = m["w"]
+        self.screen_h = m["h"]
+        self.width_var.set(str(self.screen_w))
+        self.height_var.set(str(self.screen_h))
+        preset = f"{self.screen_w}x{self.screen_h}"
+        self.resolution_var.set(preset if preset in RESOLUTION_PRESETS else "Custom")
+        self.redraw_canvas()
+
     def _on_preset_change(self, event=None):
         preset = self.resolution_var.get()
         if preset == "Custom":
@@ -275,7 +341,6 @@ class LayoutEditor:
         sx = new_w / old_w
         sy = new_h / old_h
 
-        # Proportionally rescale all widgets
         for widget in self.widgets.values():
             widget.x = int(widget.x * sx)
             widget.y = int(widget.y * sy)
@@ -287,14 +352,10 @@ class LayoutEditor:
         self.screen_w = new_w
         self.screen_h = new_h
 
-        # Update UI
         self.width_var.set(str(new_w))
         self.height_var.set(str(new_h))
         preset = f"{new_w}x{new_h}"
-        if preset in RESOLUTION_PRESETS:
-            self.resolution_var.set(preset)
-        else:
-            self.resolution_var.set("Custom")
+        self.resolution_var.set(preset if preset in RESOLUTION_PRESETS else "Custom")
 
         self.redraw_canvas()
 
@@ -322,7 +383,7 @@ class LayoutEditor:
     def load_widgets(self):
         layout = load_layout()
 
-        # Load resolution from layout
+        # Load resolution and monitor from layout
         res = layout.get("resolution")
         if res:
             self.screen_w = res.get("w", self.screen_w)
@@ -330,11 +391,16 @@ class LayoutEditor:
             self.width_var.set(str(self.screen_w))
             self.height_var.set(str(self.screen_h))
             preset = f"{self.screen_w}x{self.screen_h}"
-            if preset in RESOLUTION_PRESETS:
-                self.resolution_var.set(preset)
-            else:
-                self.resolution_var.set("Custom")
-            self._update_geometry()
+            self.resolution_var.set(preset if preset in RESOLUTION_PRESETS else "Custom")
+
+        self.monitor = layout.get("monitor", 0)
+        # Update monitor dropdown to match stored monitor
+        for i, m in enumerate(self.monitors):
+            if m["index"] == self.monitor:
+                self.monitor_combo.current(i)
+                break
+
+        self._update_geometry()
 
         running = self.get_running_themes()
         default_widgets = {
@@ -407,20 +473,16 @@ class LayoutEditor:
 
     def redraw_canvas(self):
         self.zoom_label.config(text=f"{int(self.scale * 100)}%")
-        # Save current positions
         saved = {}
         for name, w in self.widgets.items():
             saved[name] = (w.x, w.y, w.w, w.h, w.color)
-        # Resize canvas
         new_w = int(self.screen_w * self.scale)
         new_h = int(self.screen_h * self.scale)
         self.canvas.config(width=new_w, height=new_h)
         self.root.geometry(f"{new_w + 60}x{new_h + 120}")
-        # Clear and redraw
         self.canvas.delete("all")
         self.selected = None
         self._draw_grid()
-        # Redraw widgets
         self.widgets.clear()
         for name, (x, y, w, h, color) in saved.items():
             self.widgets[name] = WidgetRect(
@@ -431,12 +493,13 @@ class LayoutEditor:
 
     def save(self):
         layout = {
-            "resolution": {"w": self.screen_w, "h": self.screen_h}
+            "resolution": {"w": self.screen_w, "h": self.screen_h},
+            "monitor": self.monitor,
         }
         for name, widget in self.widgets.items():
             layout[name] = widget.to_dict()
         save_layout(layout)
-        save_positions(self.screen_w, self.screen_h, self.widgets)
+        save_positions(self.screen_w, self.screen_h, self.monitor, self.widgets)
         print(f"Layout saved to {LAYOUT_FILE}")
 
     def reset(self):
@@ -455,12 +518,9 @@ class LayoutEditor:
         for name, widget in self.widgets.items():
             try:
                 theme_dir = conky_config / name
-
-                # Update conkyrc (minimum_width/minimum_height)
                 conkyrc = theme_dir / "conkyrc"
                 if conkyrc.exists():
                     self.update_conkyrc_position(conkyrc, widget)
-
                 updated_themes.add(name)
             except Exception as e:
                 print(f"Error updating {name}: {e}")
@@ -473,7 +533,6 @@ class LayoutEditor:
         with open(target, encoding='utf-8') as f:
             content = f.read()
 
-        # gap_x/gap_y always 0 for fullscreen windows (positioning done in Lua)
         new_content = re.sub(
             r'(gap_x\s*=\s*)-?\d+',
             f'\\g<1>0',
@@ -500,45 +559,6 @@ class LayoutEditor:
                 f.write(new_content)
             print(f"Updated {conkyrc}")
 
-    def update_lua_position(self, lua_file, widget):
-        target = lua_file.resolve()
-        with open(target, encoding='utf-8') as f:
-            content = f.read()
-
-        new_content = content
-
-        # Pattern: local widget_x = N (absolute)
-        new_content = re.sub(
-            r'(local\s+widget_x\s*=\s*)\d+',
-            f'\\g<1>{int(widget.x)}',
-            new_content
-        )
-        # Pattern: local widget_y = N (absolute)
-        new_content = re.sub(
-            r'(local\s+widget_y\s*=\s*)\d+',
-            f'\\g<1>{int(widget.y)}',
-            new_content
-        )
-        # Pattern: local x = N (standalone assignment)
-        new_content = re.sub(
-            r'(local\s+x\s*=\s*)\d+(?=\s*$)',
-            f'\\g<1>{int(widget.x)}',
-            new_content,
-            flags=re.MULTILINE
-        )
-        # Pattern: local y = N (standalone assignment)
-        new_content = re.sub(
-            r'(local\s+y\s*=\s*)\d+(?=\s*$)',
-            f'\\g<1>{int(widget.y)}',
-            new_content,
-            flags=re.MULTILINE
-        )
-
-        if new_content != content:
-            with open(target, "w", encoding='utf-8') as f:
-                f.write(new_content)
-            print(f"Updated {lua_file}")
-
     def restart_themes(self, theme_names):
         conky_config = Path.home() / ".config" / "conky"
         # Kill phase
@@ -558,7 +578,6 @@ class LayoutEditor:
                             subprocess.run(['kill', parts[0]], timeout=5)
             except Exception as e:
                 print(f"Error killing {name}: {e}")
-        # Wait for processes to exit
         time.sleep(0.5)
         # Restart phase
         for name in theme_names:
@@ -567,10 +586,10 @@ class LayoutEditor:
                 continue
             try:
                 subprocess.Popen(
-                    ['conky', '-c', str(conkyrc), '-d', '-m', '0'],
+                    ['conky', '-c', str(conkyrc), '-d', '-m', str(self.monitor)],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
                 )
-                print(f"Restarted {name}")
+                print(f"Restarted {name} on monitor {self.monitor}")
             except Exception as e:
                 print(f"Failed to restart {name}: {e}")
 
