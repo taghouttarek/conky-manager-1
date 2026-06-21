@@ -38,7 +38,7 @@ conky.config = {
 
 	uppercase = false,
 
-	lua_load = '~/.config/conky/Conky_Revisited_2/Conky_Square_Horizontal/settings.lua',
+	lua_load = '~/.config/conky/revisited-conky-manager/Conky_Square_Horizontal/settings.lua',
 --	lua_load = 'settings.lua',
 	lua_draw_hook_pre = 'start_widgets',
 };
