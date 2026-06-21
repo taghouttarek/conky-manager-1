@@ -102,7 +102,9 @@ class WidgetRect:
         self.label = None
         self.resize_handle = None
         self.h_btn = None
+        self.h_btn_text = None
         self.v_btn = None
+        self.v_btn_text = None
         self.drag_data = {"x": 0, "y": 0}
         self.resizing = False
         self.draw()
@@ -135,7 +137,7 @@ class WidgetRect:
             fill="#3366cc", outline="#ffffff", width=1,
             tags=("center_h", self.name)
         )
-        self.canvas.create_text(
+        self.h_btn_text = self.canvas.create_text(
             bx + bw / 2, by + bh / 2, text="H", fill="white",
             font=("Dejavu Sans", 7, "bold"), tags=("center_h", self.name)
         )
@@ -144,7 +146,7 @@ class WidgetRect:
             fill="#3366cc", outline="#ffffff", width=1,
             tags=("center_v", self.name)
         )
-        self.canvas.create_text(
+        self.v_btn_text = self.canvas.create_text(
             bx + bw + 2 + bw / 2, by + bh / 2, text="V", fill="white",
             font=("Dejavu Sans", 7, "bold"), tags=("center_v", self.name)
         )
@@ -163,7 +165,9 @@ class WidgetRect:
         bx = sx + sw - bw * 2 - 4
         by = sy + 2
         self.canvas.coords(self.h_btn, bx, by, bx + bw, by + bh)
+        self.canvas.coords(self.h_btn_text, bx + bw / 2, by + bh / 2)
         self.canvas.coords(self.v_btn, bx + bw + 2, by, bx + bw * 2 + 2, by + bh)
+        self.canvas.coords(self.v_btn_text, bx + bw + 2 + bw / 2, by + bh / 2)
 
     def move(self, dx, dy):
         self.x = max(0, min(self.screen_w - self.w, self.x + dx))
