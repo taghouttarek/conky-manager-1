@@ -222,7 +222,7 @@ class LayoutEditor:
         self.root.minsize(500, 400)
 
         self.widgets = {}
-        self.selected = None
+        self.selected = set()
         self.mode = "move"
         self.drag_data = {"x": 0, "y": 0}
 
@@ -499,16 +499,27 @@ class LayoutEditor:
 
     def on_press(self, event):
         self.drag_data = {"x": event.x, "y": event.y}
+        ctrl = event.state & 0x4
         items = self.canvas.find_overlapping(event.x - 5, event.y - 5, event.x + 5, event.y + 5)
         for item in items:
             tags = self.canvas.gettags(item)
             for tag in tags:
                 if tag in self.widgets:
-                    self.selected = tag
+                    if ctrl:
+                        if tag in self.selected:
+                            self.selected.discard(tag)
+                        else:
+                            self.selected.add(tag)
+                    else:
+                        if tag not in self.selected:
+                            self.selected = {tag}
                     if "resize_handle" in tags:
                         self.mode_var.set("resize")
+                    self._update_selection_highlight()
                     return
-        self.selected = None
+        if not ctrl:
+            self.selected = set()
+            self._update_selection_highlight()
 
     def _on_center_h(self, event):
         for tag in self.canvas.gettags(self.canvas.find_closest(event.x, event.y)):
@@ -527,20 +538,30 @@ class LayoutEditor:
                 return
 
     def on_drag(self, event):
-        if not self.selected or self.selected not in self.widgets:
+        if not self.selected:
             return
         dx = (event.x - self.drag_data["x"]) / self.scale
         dy = (event.y - self.drag_data["y"]) / self.scale
         self.drag_data = {"x": event.x, "y": event.y}
 
-        widget = self.widgets[self.selected]
         if self.mode_var.get() == "resize":
-            widget.resize(dx, dy)
+            primary = next(iter(self.selected))
+            if primary in self.widgets:
+                self.widgets[primary].resize(dx, dy)
         else:
-            widget.move(dx, dy)
+            for name in self.selected:
+                if name in self.widgets:
+                    self.widgets[name].move(dx, dy)
 
     def on_release(self, event):
         self.drag_data = {"x": 0, "y": 0}
+
+    def _update_selection_highlight(self):
+        for name, w in self.widgets.items():
+            if name in self.selected:
+                self.canvas.itemconfig(w.rect, outline="#00ff00", width=2)
+            else:
+                self.canvas.itemconfig(w.rect, outline="#888888", width=1)
 
     def zoom_in(self):
         self.scale = min(1.5, self.scale + 0.1)
@@ -560,7 +581,7 @@ class LayoutEditor:
         self.canvas.config(width=new_w, height=new_h)
         self.root.geometry(f"{new_w + 60}x{new_h + 120}")
         self.canvas.delete("all")
-        self.selected = None
+        self.selected = set()
         self._draw_grid()
         self.widgets.clear()
         for name, (x, y, w, h, color) in saved.items():
